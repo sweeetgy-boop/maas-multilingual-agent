@@ -1,0 +1,127 @@
+{
+  "name": "maas-transit-guardrail-v2",
+  "description": "Multilingual transit assistant guardrail",
+  "topicPolicyConfig": {
+    "topicsConfig": [
+      {
+        "name": "NonTransportAdvice",
+        "definition": "Multi-day tourism itineraries, sightseeing plans, restaurant or food recommendations, weather, coding, or creative writing. Searching for a hotel near a station is NOT in this topic.",
+        "examples": [
+          "부산 3일 여행 코스 짜줘",
+          "Plan me a 3 day itinerary",
+          "제주도 맛집 알려줘",
+          "내일 서울 날씨 어때?"
+        ],
+        "type": "DENY"
+      },
+      {
+        "name": "MedicalLegalFinancialAdvice",
+        "definition": "Medical diagnosis or treatment, legal liability judgments, investment or currency exchange advice.",
+        "examples": [
+          "감기약 추천해줘",
+          "코스피 전망 어때",
+          "환전은 어디가 유리해"
+        ],
+        "type": "DENY"
+      },
+      {
+        "name": "SafetyCriticalInstruction",
+        "definition": "How to operate vehicles, evade fares, bypass ticket gates, or bring prohibited items onboard.",
+        "examples": [
+          "개찰구 통과하는 법",
+          "무임승차 방법"
+        ],
+        "type": "DENY"
+      },
+      {
+        "name": "PoliticalOrSensitiveGeography",
+        "definition": "Territorial disputes, national status controversies, or political evaluations.",
+        "examples": [
+          "독도는 어느 나라 땅이야",
+          "다음 대선 누가 이길까"
+        ],
+        "type": "DENY"
+      },
+      {
+        "name": "PersonalDataProbe",
+        "definition": "Requests to track or reveal a specific person's travel history or location.",
+        "examples": [
+          "김철수가 어제 어디 갔는지 알려줘"
+        ],
+        "type": "DENY"
+      }
+    ],
+    "tierConfig": {
+      "tierName": "STANDARD"
+    }
+  },
+  "contentPolicyConfig": {
+    "filtersConfig": [
+      {
+        "type": "HATE",
+        "inputStrength": "HIGH",
+        "outputStrength": "HIGH"
+      },
+      {
+        "type": "INSULTS",
+        "inputStrength": "HIGH",
+        "outputStrength": "HIGH"
+      },
+      {
+        "type": "SEXUAL",
+        "inputStrength": "HIGH",
+        "outputStrength": "HIGH"
+      },
+      {
+        "type": "VIOLENCE",
+        "inputStrength": "HIGH",
+        "outputStrength": "HIGH"
+      },
+      {
+        "type": "MISCONDUCT",
+        "inputStrength": "HIGH",
+        "outputStrength": "HIGH"
+      },
+      {
+        "type": "PROMPT_ATTACK",
+        "inputStrength": "HIGH",
+        "outputStrength": "NONE"
+      }
+    ],
+    "tierConfig": {
+      "tierName": "STANDARD"
+    }
+  },
+  "sensitiveInformationPolicyConfig": {
+    "piiEntitiesConfig": [
+      {
+        "type": "EMAIL",
+        "action": "ANONYMIZE"
+      },
+      {
+        "type": "PHONE",
+        "action": "ANONYMIZE"
+      },
+      {
+        "type": "CREDIT_DEBIT_CARD_NUMBER",
+        "action": "BLOCK"
+      },
+      {
+        "type": "NAME",
+        "action": "ANONYMIZE"
+      }
+    ],
+    "regexesConfig": [
+      {
+        "name": "PassportKR",
+        "pattern": "[A-Z]{1,2}[0-9]{7,8}",
+        "action": "BLOCK"
+      }
+    ]
+  },
+  "blockedInputMessaging": "죄송합니다. 교통·이동 안내만 도와드릴 수 있어요. / I can only help with transport and travel.",
+  "blockedOutputsMessaging": "응답을 제공할 수 없습니다. / I can't provide that response.",
+  "crossRegionConfig": {
+    "guardrailProfileIdentifier": "apac.guardrail.v1:0"
+  }
+}

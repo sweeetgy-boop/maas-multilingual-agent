@@ -1,0 +1,23 @@
+{
+  "tag": "smoke",
+  "by_lang": {
+    "ko": {
+      "n": 1,
+      "parse_error": 1
+    },
+    "ALL": {
+      "n": 1,
+      "parse_error": 1
+    }
+  },
+  "slot_f1": 0,
+  "latency_p50": null,
+  "latency_p95": null,
+  "errors": [
+    [
+      "ko-001",
+      "PARSE_ERROR",
+      "[Errno 111] Connection refused"
+    ]
+  ]
+}

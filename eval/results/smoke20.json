@@ -1,0 +1,37 @@
+{
+  "tag": "smoke20",
+  "by_lang": {
+    "ko": {
+      "n": 20,
+      "domain_ok": 19,
+      "pos": 17,
+      "tox_ok": 20,
+      "route_ok": 15,
+      "intent_ok": 12,
+      "escalated": 11,
+      "fp": 1,
+      "neg": 3
+    },
+    "ALL": {
+      "n": 20,
+      "domain_ok": 19,
+      "pos": 17,
+      "tox_ok": 20,
+      "route_ok": 15,
+      "intent_ok": 12,
+      "escalated": 11,
+      "fp": 1,
+      "neg": 3
+    }
+  },
+  "slot_f1": 0.774,
+  "latency_p50": 2.022,
+  "latency_p95": 2.249,
+  "errors": [
+    [
+      "ko-005",
+      "domain",
+      "want=True got=False [simple]"
+    ]
+  ]
+}

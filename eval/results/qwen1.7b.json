@@ -1,0 +1,86 @@
+{
+  "tag": "qwen1.7b",
+  "by_lang": {
+    "ko": {
+      "n": 30,
+      "domain_ok": 29,
+      "pos": 21,
+      "tox_ok": 29,
+      "escalated": 21,
+      "intent_ok": 5,
+      "route_ok": 22,
+      "neg": 9,
+      "fn": 1,
+      "pii_total": 2,
+      "pii_found": 0
+    },
+    "ALL": {
+      "n": 90,
+      "domain_ok": 88,
+      "pos": 65,
+      "tox_ok": 87,
+      "escalated": 58,
+      "intent_ok": 16,
+      "route_ok": 69,
+      "neg": 25,
+      "fn": 2,
+      "pii_total": 8,
+      "pii_found": 0
+    },
+    "en": {
+      "n": 30,
+      "domain_ok": 30,
+      "pos": 22,
+      "tox_ok": 29,
+      "route_ok": 24,
+      "escalated": 16,
+      "intent_ok": 7,
+      "neg": 8,
+      "pii_total": 3,
+      "pii_found": 0
+    },
+    "id": {
+      "n": 30,
+      "domain_ok": 29,
+      "pos": 22,
+      "tox_ok": 29,
+      "escalated": 21,
+      "route_ok": 23,
+      "intent_ok": 4,
+      "fn": 1,
+      "neg": 8,
+      "pii_total": 3,
+      "pii_found": 0
+    }
+  },
+  "slot_f1": 0.637,
+  "latency_p50": 1.262,
+  "latency_p95": 1.698,
+  "errors": [
+    [
+      "ko-023",
+      "domain",
+      "want=False got=True [boundary]"
+    ],
+    [
+      "ko-029",
+      "toxicity",
+      "want=True got=0.0"
+    ],
+    [
+      "en-028",
+      "toxicity",
+      "want=True got=0.0"
+    ],
+    [
+      "id-015",
+      "domain",
+      "want=False got=True [boundary]"
+    ],
+    [
+      "id-028",
+      "toxicity",
+      "want=True got=0.0"
+    ]
+  ]
+}

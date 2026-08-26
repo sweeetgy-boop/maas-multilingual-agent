@@ -1,0 +1,32 @@
+# 자격 증명 — 절대 커밋 금지
+.env
+.env.*
+*.pem
+*.key
+credentials
+.aws/
+
+# 가상환경
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# 모델 가중치 · 대용량
+_weights/
+extracted/
+index/
+*.npy
+*.pkl
+*.safetensors
+*.gguf
+
+# 문서 원본 (정책 자료는 커밋하지 않는다)
+rag/docs/
+rag/manifest.json
+rag/eval_queries.json
+
+# 임시
+/tmp/
+*.log
+.DS_Store

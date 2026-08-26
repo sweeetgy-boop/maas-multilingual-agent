@@ -1,0 +1,14 @@
+# 파이프라인
+httpx>=0.28
+boto3>=1.35
+botocore[crt]>=1.35
+
+# UI
+fastapi>=0.115
+uvicorn>=0.34
+pydantic>=2.10
+
+# RAG (선택)
+# numpy>=1.26
+# torch>=2.4
+# sentence-transformers>=3.0
