@@ -15,6 +15,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+from geocode import geocode
+from transit_nodes import NODE_BY_ID, find_access_points
+
 # ── 지명 정규화 사전 (다국어 별칭 → 표준 ID) ──
 # 실제로는 임베딩 + FAISS 로 처리하지만, PoC 는 사전으로 충분하다.
 PLACE_ALIASES = {
@@ -51,16 +54,51 @@ PLACE_NAMES = {
 }
 
 
-def resolve_place(text: str | None) -> str | None:
-    """자유문 지명 → 표준 ID. 모든 도구의 선행 단계."""
+def _place_from_id(pid: str, fallback_name: str) -> dict:
+    """레거시 PLACE_ALIASES 표준 ID를 신규 반환 구조로 감싼다.
+    transit_nodes.json 에 같은 id 로 등록된 노드가 있으면(17개 레거시
+    허브는 그렇게 등록해 뒀다) 좌표까지 채운다."""
+    node = NODE_BY_ID.get(pid)
+    if node is not None:
+        return {"id": pid, "name": node["name"], "lat": node["lat"], "lon": node["lon"],
+                "access_points": [{"name": node["name"], "type": node["type"], "distance_m": 0}]}
+    return {"id": pid, "name": fallback_name, "lat": None, "lon": None,
+            "access_points": [{"name": fallback_name, "type": "unknown", "distance_m": 0}]}
+
+
+def resolve_place(text: str | None) -> dict | None:
+    """자유문 지명 → {id, name, lat, lon, access_points}. 모든 도구의 선행 단계.
+
+    순서:
+      1. 기존 PLACE_ALIASES **정확히 일치**하는 경우만 즉시 반환 (하위 호환,
+         17개 철도역/공항/터미널 — 외부 조회 없이 가장 빠르다).
+      2. geocode(): transit_nodes.json 직접 매칭 → admin_areas.json → (선택)
+         외부 API 순으로 시도한다. transit_node 매칭이면 그 자체가 접근점,
+         아니면 좌표 기준 find_access_points() 로 접근점을 채운다.
+      3. 그래도 못 찾으면 PLACE_ALIASES **부분 문자열** 매칭을 최후 폴백으로
+         쓴다. 이걸 2단계보다 먼저 하면 "부산 광안리"가 "부산"에 부분
+         일치해 부산역으로 잘못 해소되는 문제가 재발한다 — 반드시 이 순서.
+    """
     if not text:
         return None
     t = text.strip().casefold()
+
     if t in PLACE_ALIASES:
-        return PLACE_ALIASES[t]
+        pid = PLACE_ALIASES[t]
+        return _place_from_id(pid, PLACE_NAMES.get(pid, text.strip()))
+
+    g = geocode(text)
+    if g is not None:
+        if g["source"] == "transit_node":
+            return {"id": g["id"], "name": g["name"], "lat": g["lat"], "lon": g["lon"],
+                    "access_points": [{"name": g["name"], "type": g["type"], "distance_m": 0}]}
+        return {"id": g["id"], "name": g["name"], "lat": g["lat"], "lon": g["lon"],
+                "access_points": find_access_points(g["lat"], g["lon"])}
+
     for alias, pid in PLACE_ALIASES.items():
         if alias in t or t in alias:
-            return pid
+            return _place_from_id(pid, PLACE_NAMES.get(pid, text.strip()))
+
     return None
 
 
@@ -96,19 +134,25 @@ RAIL_TABLE = {
 }
 
 
+def _unresolved(origin, o, destination, d, source: str) -> dict:
+    unresolved = [x for x, r in ((origin, o), (destination, d)) if x and not r]
+    return _stamp({"found": False, "reason": "unresolved_place",
+                   "unresolved": unresolved,
+                   "hint": "입력하신 지명을 인식하지 못했습니다. 정확한 역명, 터미널명, "
+                           "공항명 또는 시/군/구 명을 입력해 주세요."},
+                  source)
+
+
 def search_rail(origin: str | None, destination: str | None,
                 datetime_hint: str | None = None, pax: int | None = None) -> dict:
     o, d = resolve_place(origin), resolve_place(destination)
     if not o or not d:
-        return _stamp({"found": False,
-                       "reason": "unresolved_place",
-                       "unresolved": [x for x, r in ((origin, o), (destination, d)) if not r]},
-                      "KORAIL/SR OpenAPI (mock)")
+        return _unresolved(origin, o, destination, d, "KORAIL/SR OpenAPI (mock)")
 
-    rows = RAIL_TABLE.get((o, d)) or RAIL_TABLE.get((d, o))
+    rows = RAIL_TABLE.get((o["id"], d["id"])) or RAIL_TABLE.get((d["id"], o["id"]))
     if not rows:
         return _stamp({"found": False, "reason": "no_direct_service",
-                       "origin": PLACE_NAMES.get(o), "destination": PLACE_NAMES.get(d)},
+                       "origin": o["name"], "destination": d["name"]},
                       "KORAIL/SR OpenAPI (mock)")
 
     base = _base_date(datetime_hint)
@@ -124,8 +168,8 @@ def search_rail(origin: str | None, destination: str | None,
             "fare_krw": fare * n,
             "seats_available": True,
         })
-    return _stamp({"found": True, "origin": PLACE_NAMES.get(o),
-                   "destination": PLACE_NAMES.get(d), "pax": n, "trains": trains},
+    return _stamp({"found": True, "origin": o["name"],
+                   "destination": d["name"], "pax": n, "trains": trains},
                   "KORAIL/SR OpenAPI (mock)")
 
 
@@ -140,13 +184,13 @@ BUS_TABLE = {
 def search_bus(origin=None, destination=None, datetime_hint=None, pax=None) -> dict:
     o, d = resolve_place(origin), resolve_place(destination)
     if not o or not d:
-        return _stamp({"found": False, "reason": "unresolved_place"}, "TAGO 버스 API (mock)")
-    rows = BUS_TABLE.get((o, d)) or BUS_TABLE.get((d, o))
+        return _unresolved(origin, o, destination, d, "TAGO 버스 API (mock)")
+    rows = BUS_TABLE.get((o["id"], d["id"])) or BUS_TABLE.get((d["id"], o["id"]))
     if not rows:
         return _stamp({"found": False, "reason": "no_direct_service"}, "TAGO 버스 API (mock)")
     base = _base_date(datetime_hint)
     n = pax or 1
-    return _stamp({"found": True, "origin": PLACE_NAMES.get(o), "destination": PLACE_NAMES.get(d),
+    return _stamp({"found": True, "origin": o["name"], "destination": d["name"],
                    "pax": n,
                    "buses": [{"route": r, "departure": (base + timedelta(minutes=40 * i)).strftime("%Y-%m-%d %H:%M"),
                               "duration_min": m, "fare_krw": f * n}
@@ -164,13 +208,13 @@ FLIGHT_TABLE = {
 def search_flight(origin=None, destination=None, datetime_hint=None, pax=None) -> dict:
     o, d = resolve_place(origin), resolve_place(destination)
     if not o or not d:
-        return _stamp({"found": False, "reason": "unresolved_place"}, "한국공항공사 API (mock)")
-    rows = FLIGHT_TABLE.get((o, d)) or FLIGHT_TABLE.get((d, o))
+        return _unresolved(origin, o, destination, d, "한국공항공사 API (mock)")
+    rows = FLIGHT_TABLE.get((o["id"], d["id"])) or FLIGHT_TABLE.get((d["id"], o["id"]))
     if not rows:
         return _stamp({"found": False, "reason": "no_direct_service"}, "한국공항공사 API (mock)")
     base = _base_date(datetime_hint)
     n = pax or 1
-    return _stamp({"found": True, "origin": PLACE_NAMES.get(o), "destination": PLACE_NAMES.get(d),
+    return _stamp({"found": True, "origin": o["name"], "destination": d["name"],
                    "pax": n,
                    "flights": [{"flight_no": f, "departure": (base + timedelta(minutes=90 * i)).strftime("%Y-%m-%d %H:%M"),
                                 "duration_min": m, "fare_krw": p * n}
@@ -181,8 +225,12 @@ def search_flight(origin=None, destination=None, datetime_hint=None, pax=None) -
 def search_lodging(destination=None, datetime_hint=None, pax=None, origin=None) -> dict:
     d = resolve_place(destination) or resolve_place(origin)
     if not d:
-        return _stamp({"found": False, "reason": "unresolved_place"}, "한국관광공사 TourAPI (mock)")
-    name = PLACE_NAMES.get(d, destination)
+        return _stamp({"found": False, "reason": "unresolved_place",
+                       "unresolved": [x for x in (destination, origin) if x],
+                       "hint": "입력하신 지명을 인식하지 못했습니다. 정확한 역명, 터미널명, "
+                               "공항명 또는 시/군/구 명을 입력해 주세요."},
+                      "한국관광공사 TourAPI (mock)")
+    name = d["name"]
     return _stamp({"found": True, "near": name,
                    "hotels": [
                        {"name": f"{name} 스테이션 호텔", "distance_m": 220, "price_krw": 98000, "rating": 4.2},
@@ -195,8 +243,12 @@ def search_share_mobility(origin=None, destination=None, **_) -> dict:
     # "강남역 근처 따릉이" 처럼 기준점이 destination 으로 들어오는 경우가 많다
     o = resolve_place(origin) or resolve_place(destination)
     if not o:
-        return _stamp({"found": False, "reason": "unresolved_place"}, "GBFS (mock)")
-    name = PLACE_NAMES.get(o, origin)
+        return _stamp({"found": False, "reason": "unresolved_place",
+                       "unresolved": [x for x in (origin, destination) if x],
+                       "hint": "입력하신 지명을 인식하지 못했습니다. 정확한 역명, 터미널명, "
+                               "공항명 또는 시/군/구 명을 입력해 주세요."},
+                      "GBFS (mock)")
+    name = o["name"]
     return _stamp({"found": True, "near": name,
                    "bike_stations": [
                        {"station": f"{name} 1번 출구", "distance_m": 80, "bikes_available": 7, "docks_free": 12},
@@ -217,24 +269,56 @@ def get_realtime_status(**_) -> dict:
                    ]}, "GTFS-RT (mock)")
 
 
+# 접근점 타입별 대표 이동수단·소요시간·요금 (mock). 실 서비스에서는
+# OpenTripPlanner 가 실제 경로 탐색으로 계산해 채운다.
+_HUB_MODE = {"rail": ("RAIL", 120, 45000), "bus_terminal": ("BUS", 150, 22000),
+             "airport": ("AIR", 70, 65000), "subway": ("SUBWAY", 25, 1500),
+             "unknown": ("RAIL", 120, 45000)}
+
+
 def plan_journey(origin=None, destination=None, datetime_hint=None, pax=None) -> dict:
     o, d = resolve_place(origin), resolve_place(destination)
     if not o or not d:
-        return _stamp({"found": False, "reason": "unresolved_place"}, "OpenTripPlanner (mock)")
+        return _unresolved(origin, o, destination, d, "OpenTripPlanner (mock)")
+
+    if not o["access_points"]:
+        return _stamp({"found": False, "reason": "no_transit_access", "destination": o["name"],
+                       "hint": f"{o['name']}까지 연결되는 철도·버스 노선을 찾지 못했습니다"},
+                      "OpenTripPlanner (mock)")
+    if not d["access_points"]:
+        return _stamp({"found": False, "reason": "no_transit_access", "destination": d["name"],
+                       "hint": f"{d['name']}까지 연결되는 철도·버스 노선을 찾지 못했습니다"},
+                      "OpenTripPlanner (mock)")
+
+    o_hub, d_hub = o["access_points"][0], d["access_points"][0]
     base = _base_date(datetime_hint)
-    return _stamp({"found": True, "origin": PLACE_NAMES.get(o), "destination": PLACE_NAMES.get(d),
-                   "itineraries": [{
-                       "total_min": 195, "total_fare_krw": 62800, "transfers": 1,
-                       "legs": [
-                           {"mode": "WALK", "from": PLACE_NAMES.get(o), "to": f"{PLACE_NAMES.get(o)} 승강장",
-                            "duration_min": 6, "fare_krw": 0},
-                           {"mode": "RAIL", "from": PLACE_NAMES.get(o), "to": PLACE_NAMES.get(d),
-                            "service": "KTX 101", "duration_min": 158, "fare_krw": 59800,
-                            "departure": base.strftime("%Y-%m-%d %H:%M")},
-                           {"mode": "SUBWAY", "from": PLACE_NAMES.get(d), "to": "목적지 인근",
-                            "duration_min": 31, "fare_krw": 3000},
-                       ]}]},
-                  "OpenTripPlanner (mock)")
+    n = pax or 1
+    mode, mins, fare = _HUB_MODE.get(d_hub["type"], _HUB_MODE["unknown"])
+
+    legs = [
+        {"mode": "WALK", "from": o["name"], "to": f"{o_hub['name']} 승강장",
+         "duration_min": 6, "fare_krw": 0},
+        {"mode": mode, "from": o_hub["name"], "to": d_hub["name"],
+         "duration_min": mins, "fare_krw": fare * n,
+         "departure": base.strftime("%Y-%m-%d %H:%M")},
+    ]
+    total_min, total_fare = 6 + mins, fare * n
+
+    # 목적지 자체가 접근점이 아니라 일반 지역이면(distance_m > 0) 마지막 구간을 명시한다
+    if d_hub["distance_m"] > 0:
+        legs.append({"mode": "LOCAL", "from": d_hub["name"], "to": f"{d['name']} 시내",
+                     "note": f"{d_hub['name']}에서 목적지까지는 시내 대중교통 또는 택시 이용"})
+
+    result = {"found": True, "origin": o["name"], "destination": d["name"], "pax": n,
+              "itineraries": [{"total_min": total_min, "total_fare_krw": total_fare,
+                               "transfers": len(legs) - 1, "legs": legs}]}
+
+    if len(d["access_points"]) > 1:
+        alts = ", ".join(f"{ap['name']}({round(ap['distance_m'] / 1000, 1)}km)"
+                         for ap in d["access_points"])
+        result["destination_access_note"] = f"{d['name']} 인근 접근점: {alts}"
+
+    return _stamp(result, "OpenTripPlanner (mock)")
 
 
 # 게이트가 반환하는 intent → 도구 매핑

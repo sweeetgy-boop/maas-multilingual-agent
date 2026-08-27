@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import os
 import sys
 import time
@@ -27,6 +26,8 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+from geo_utils import haversine_m
 
 API_KEY_ENV = "SEOUL_OPEN_API_KEY"
 BASE_URL = "http://openapi.seoul.go.kr:8088"
@@ -74,15 +75,6 @@ def _area_center(area_name: str) -> tuple[float, float] | None:
     return a["lat"], a["lon"]
 
 
-def _haversine_m(p1: tuple[float, float], p2: tuple[float, float]) -> float:
-    r = 6371000.0
-    lat1, lon1 = math.radians(p1[0]), math.radians(p1[1])
-    lat2, lon2 = math.radians(p2[0]), math.radians(p2[1])
-    dlat, dlon = lat2 - lat1, lon2 - lon1
-    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
-    return 2 * r * math.asin(math.sqrt(a))
-
-
 def _nearest(area_name: str, rows: list[dict], limit: int) -> list[dict]:
     """lat/lon 이 있는 항목은 장소 중심좌표 기준 가까운 순으로, 없으면 원래 순서로 자른다."""
     center = _area_center(area_name)
@@ -92,7 +84,7 @@ def _nearest(area_name: str, rows: list[dict], limit: int) -> list[dict]:
     def dist(r):
         if r.get("lat") is None or r.get("lon") is None:
             return float("inf")
-        return _haversine_m(center, (r["lat"], r["lon"]))
+        return haversine_m(center, (r["lat"], r["lon"]))
 
     return sorted(rows, key=dist)[:limit]
 
