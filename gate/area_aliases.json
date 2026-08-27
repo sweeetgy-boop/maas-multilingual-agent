@@ -1,0 +1,1577 @@
+{
+ "강남 MICE 관광특구": {
+  "code": "POI001",
+  "name": "강남 MICE 관광특구",
+  "category": "관광특구"
+ },
+ "gangnam mice special tourist zone": {
+  "code": "POI001",
+  "name": "강남 MICE 관광특구",
+  "category": "관광특구"
+ },
+ "동대문 관광특구": {
+  "code": "POI002",
+  "name": "동대문 관광특구",
+  "category": "관광특구"
+ },
+ "dongdaemun fashion town special tourist zone": {
+  "code": "POI002",
+  "name": "동대문 관광특구",
+  "category": "관광특구"
+ },
+ "명동 관광특구": {
+  "code": "POI003",
+  "name": "명동 관광특구",
+  "category": "관광특구"
+ },
+ "myeong-dong namdaemun bukchang-dong da-dong mugyo-dong special tourist zone": {
+  "code": "POI003",
+  "name": "명동 관광특구",
+  "category": "관광특구"
+ },
+ "이태원 관광특구": {
+  "code": "POI004",
+  "name": "이태원 관광특구",
+  "category": "관광특구"
+ },
+ "itaewon special tourist zone": {
+  "code": "POI004",
+  "name": "이태원 관광특구",
+  "category": "관광특구"
+ },
+ "잠실 관광특구": {
+  "code": "POI005",
+  "name": "잠실 관광특구",
+  "category": "관광특구"
+ },
+ "jamsil special tourist zone": {
+  "code": "POI005",
+  "name": "잠실 관광특구",
+  "category": "관광특구"
+ },
+ "종로·청계 관광특구": {
+  "code": "POI006",
+  "name": "종로·청계 관광특구",
+  "category": "관광특구"
+ },
+ "종로": {
+  "code": "POI006",
+  "name": "종로·청계 관광특구",
+  "category": "관광특구"
+ },
+ "청계 관광특구": {
+  "code": "POI006",
+  "name": "종로·청계 관광특구",
+  "category": "관광특구"
+ },
+ "jongno cheonggye special toruist zone": {
+  "code": "POI006",
+  "name": "종로·청계 관광특구",
+  "category": "관광특구"
+ },
+ "홍대 관광특구": {
+  "code": "POI007",
+  "name": "홍대 관광특구",
+  "category": "관광특구"
+ },
+ "hongdae culture & arts special tourist zone": {
+  "code": "POI007",
+  "name": "홍대 관광특구",
+  "category": "관광특구"
+ },
+ "경복궁": {
+  "code": "POI008",
+  "name": "경복궁",
+  "category": "고궁·문화유산"
+ },
+ "gyeongbokgung palace": {
+  "code": "POI008",
+  "name": "경복궁",
+  "category": "고궁·문화유산"
+ },
+ "광화문·덕수궁": {
+  "code": "POI009",
+  "name": "광화문·덕수궁",
+  "category": "고궁·문화유산"
+ },
+ "광화문": {
+  "code": "POI009",
+  "name": "광화문·덕수궁",
+  "category": "고궁·문화유산"
+ },
+ "덕수궁": {
+  "code": "POI009",
+  "name": "광화문·덕수궁",
+  "category": "고궁·문화유산"
+ },
+ "gwanghwamun & deoksugung palace": {
+  "code": "POI009",
+  "name": "광화문·덕수궁",
+  "category": "고궁·문화유산"
+ },
+ "보신각": {
+  "code": "POI010",
+  "name": "보신각",
+  "category": "고궁·문화유산"
+ },
+ "bosingak": {
+  "code": "POI010",
+  "name": "보신각",
+  "category": "고궁·문화유산"
+ },
+ "서울 암사동 유적": {
+  "code": "POI011",
+  "name": "서울 암사동 유적",
+  "category": "고궁·문화유산"
+ },
+ "amsa prehistoric settlement site": {
+  "code": "POI011",
+  "name": "서울 암사동 유적",
+  "category": "고궁·문화유산"
+ },
+ "창덕궁·종묘": {
+  "code": "POI012",
+  "name": "창덕궁·종묘",
+  "category": "고궁·문화유산"
+ },
+ "창덕궁": {
+  "code": "POI012",
+  "name": "창덕궁·종묘",
+  "category": "고궁·문화유산"
+ },
+ "종묘": {
+  "code": "POI012",
+  "name": "창덕궁·종묘",
+  "category": "고궁·문화유산"
+ },
+ "changdeokgung palace & jongmyo shrine": {
+  "code": "POI012",
+  "name": "창덕궁·종묘",
+  "category": "고궁·문화유산"
+ },
+ "가산디지털단지역": {
+  "code": "POI013",
+  "name": "가산디지털단지역",
+  "category": "인구밀집지역"
+ },
+ "가산디지털단지": {
+  "code": "POI013",
+  "name": "가산디지털단지역",
+  "category": "인구밀집지역"
+ },
+ "gasan digital complex station": {
+  "code": "POI013",
+  "name": "가산디지털단지역",
+  "category": "인구밀집지역"
+ },
+ "강남역": {
+  "code": "POI014",
+  "name": "강남역",
+  "category": "인구밀집지역"
+ },
+ "강남": {
+  "code": "POI014",
+  "name": "강남역",
+  "category": "인구밀집지역"
+ },
+ "gangnam station": {
+  "code": "POI014",
+  "name": "강남역",
+  "category": "인구밀집지역"
+ },
+ "건대입구역": {
+  "code": "POI015",
+  "name": "건대입구역",
+  "category": "인구밀집지역"
+ },
+ "건대입구": {
+  "code": "POI015",
+  "name": "건대입구역",
+  "category": "인구밀집지역"
+ },
+ "konkuk university station": {
+  "code": "POI015",
+  "name": "건대입구역",
+  "category": "인구밀집지역"
+ },
+ "고덕역": {
+  "code": "POI016",
+  "name": "고덕역",
+  "category": "인구밀집지역"
+ },
+ "고덕": {
+  "code": "POI016",
+  "name": "고덕역",
+  "category": "인구밀집지역"
+ },
+ "godeok station": {
+  "code": "POI016",
+  "name": "고덕역",
+  "category": "인구밀집지역"
+ },
+ "고속터미널역": {
+  "code": "POI017",
+  "name": "고속터미널역",
+  "category": "인구밀집지역"
+ },
+ "고속터미널": {
+  "code": "POI017",
+  "name": "고속터미널역",
+  "category": "인구밀집지역"
+ },
+ "express bus terminal station": {
+  "code": "POI017",
+  "name": "고속터미널역",
+  "category": "인구밀집지역"
+ },
+ "교대역": {
+  "code": "POI018",
+  "name": "교대역",
+  "category": "인구밀집지역"
+ },
+ "교대": {
+  "code": "POI018",
+  "name": "교대역",
+  "category": "인구밀집지역"
+ },
+ "seoul national university of education station": {
+  "code": "POI018",
+  "name": "교대역",
+  "category": "인구밀집지역"
+ },
+ "구로디지털단지역": {
+  "code": "POI019",
+  "name": "구로디지털단지역",
+  "category": "인구밀집지역"
+ },
+ "구로디지털단지": {
+  "code": "POI019",
+  "name": "구로디지털단지역",
+  "category": "인구밀집지역"
+ },
+ "guro digital complex station": {
+  "code": "POI019",
+  "name": "구로디지털단지역",
+  "category": "인구밀집지역"
+ },
+ "구로역": {
+  "code": "POI020",
+  "name": "구로역",
+  "category": "인구밀집지역"
+ },
+ "구로": {
+  "code": "POI020",
+  "name": "구로역",
+  "category": "인구밀집지역"
+ },
+ "guro station": {
+  "code": "POI020",
+  "name": "구로역",
+  "category": "인구밀집지역"
+ },
+ "군자역": {
+  "code": "POI021",
+  "name": "군자역",
+  "category": "인구밀집지역"
+ },
+ "군자": {
+  "code": "POI021",
+  "name": "군자역",
+  "category": "인구밀집지역"
+ },
+ "gunja station": {
+  "code": "POI021",
+  "name": "군자역",
+  "category": "인구밀집지역"
+ },
+ "대림역": {
+  "code": "POI023",
+  "name": "대림역",
+  "category": "인구밀집지역"
+ },
+ "대림": {
+  "code": "POI023",
+  "name": "대림역",
+  "category": "인구밀집지역"
+ },
+ "daerim station": {
+  "code": "POI023",
+  "name": "대림역",
+  "category": "인구밀집지역"
+ },
+ "동대문역": {
+  "code": "POI024",
+  "name": "동대문역",
+  "category": "인구밀집지역"
+ },
+ "동대문": {
+  "code": "POI024",
+  "name": "동대문역",
+  "category": "인구밀집지역"
+ },
+ "dongdaemun station": {
+  "code": "POI024",
+  "name": "동대문역",
+  "category": "인구밀집지역"
+ },
+ "뚝섬역": {
+  "code": "POI025",
+  "name": "뚝섬역",
+  "category": "인구밀집지역"
+ },
+ "뚝섬": {
+  "code": "POI025",
+  "name": "뚝섬역",
+  "category": "인구밀집지역"
+ },
+ "ttukseom station": {
+  "code": "POI025",
+  "name": "뚝섬역",
+  "category": "인구밀집지역"
+ },
+ "미아사거리역": {
+  "code": "POI026",
+  "name": "미아사거리역",
+  "category": "인구밀집지역"
+ },
+ "미아사거리": {
+  "code": "POI026",
+  "name": "미아사거리역",
+  "category": "인구밀집지역"
+ },
+ "miasageori station": {
+  "code": "POI026",
+  "name": "미아사거리역",
+  "category": "인구밀집지역"
+ },
+ "발산역": {
+  "code": "POI027",
+  "name": "발산역",
+  "category": "인구밀집지역"
+ },
+ "발산": {
+  "code": "POI027",
+  "name": "발산역",
+  "category": "인구밀집지역"
+ },
+ "balsan station": {
+  "code": "POI027",
+  "name": "발산역",
+  "category": "인구밀집지역"
+ },
+ "사당역": {
+  "code": "POI029",
+  "name": "사당역",
+  "category": "인구밀집지역"
+ },
+ "사당": {
+  "code": "POI029",
+  "name": "사당역",
+  "category": "인구밀집지역"
+ },
+ "sadang station": {
+  "code": "POI029",
+  "name": "사당역",
+  "category": "인구밀집지역"
+ },
+ "삼각지역": {
+  "code": "POI030",
+  "name": "삼각지역",
+  "category": "인구밀집지역"
+ },
+ "삼각지": {
+  "code": "POI030",
+  "name": "삼각지역",
+  "category": "인구밀집지역"
+ },
+ "samgakji station": {
+  "code": "POI030",
+  "name": "삼각지역",
+  "category": "인구밀집지역"
+ },
+ "서울대입구역": {
+  "code": "POI031",
+  "name": "서울대입구역",
+  "category": "인구밀집지역"
+ },
+ "서울대입구": {
+  "code": "POI031",
+  "name": "서울대입구역",
+  "category": "인구밀집지역"
+ },
+ "seoul national university station": {
+  "code": "POI031",
+  "name": "서울대입구역",
+  "category": "인구밀집지역"
+ },
+ "서울식물원·마곡나루역": {
+  "code": "POI032",
+  "name": "서울식물원·마곡나루역",
+  "category": "인구밀집지역"
+ },
+ "서울식물원": {
+  "code": "POI032",
+  "name": "서울식물원·마곡나루역",
+  "category": "인구밀집지역"
+ },
+ "마곡나루역": {
+  "code": "POI032",
+  "name": "서울식물원·마곡나루역",
+  "category": "인구밀집지역"
+ },
+ "seoul botanic park·magongnaru station": {
+  "code": "POI032",
+  "name": "서울식물원·마곡나루역",
+  "category": "인구밀집지역"
+ },
+ "서울역": {
+  "code": "POI033",
+  "name": "서울역",
+  "category": "인구밀집지역"
+ },
+ "서울": {
+  "code": "POI033",
+  "name": "서울역",
+  "category": "인구밀집지역"
+ },
+ "seoul station": {
+  "code": "POI033",
+  "name": "서울역",
+  "category": "인구밀집지역"
+ },
+ "선릉역": {
+  "code": "POI034",
+  "name": "선릉역",
+  "category": "인구밀집지역"
+ },
+ "선릉": {
+  "code": "POI034",
+  "name": "선릉역",
+  "category": "인구밀집지역"
+ },
+ "seolleung station": {
+  "code": "POI034",
+  "name": "선릉역",
+  "category": "인구밀집지역"
+ },
+ "성신여대입구역": {
+  "code": "POI035",
+  "name": "성신여대입구역",
+  "category": "인구밀집지역"
+ },
+ "성신여대입구": {
+  "code": "POI035",
+  "name": "성신여대입구역",
+  "category": "인구밀집지역"
+ },
+ "sungshin women's university station": {
+  "code": "POI035",
+  "name": "성신여대입구역",
+  "category": "인구밀집지역"
+ },
+ "수유역": {
+  "code": "POI036",
+  "name": "수유역",
+  "category": "인구밀집지역"
+ },
+ "수유": {
+  "code": "POI036",
+  "name": "수유역",
+  "category": "인구밀집지역"
+ },
+ "suyu station": {
+  "code": "POI036",
+  "name": "수유역",
+  "category": "인구밀집지역"
+ },
+ "신논현역·논현역": {
+  "code": "POI037",
+  "name": "신논현역·논현역",
+  "category": "인구밀집지역"
+ },
+ "신논현역": {
+  "code": "POI037",
+  "name": "신논현역·논현역",
+  "category": "인구밀집지역"
+ },
+ "논현역": {
+  "code": "POI037",
+  "name": "신논현역·논현역",
+  "category": "인구밀집지역"
+ },
+ "sinnonhyeon·nonhyeon station": {
+  "code": "POI037",
+  "name": "신논현역·논현역",
+  "category": "인구밀집지역"
+ },
+ "신도림역": {
+  "code": "POI038",
+  "name": "신도림역",
+  "category": "인구밀집지역"
+ },
+ "신도림": {
+  "code": "POI038",
+  "name": "신도림역",
+  "category": "인구밀집지역"
+ },
+ "sindorim station": {
+  "code": "POI038",
+  "name": "신도림역",
+  "category": "인구밀집지역"
+ },
+ "신림역": {
+  "code": "POI039",
+  "name": "신림역",
+  "category": "인구밀집지역"
+ },
+ "신림": {
+  "code": "POI039",
+  "name": "신림역",
+  "category": "인구밀집지역"
+ },
+ "sillim station": {
+  "code": "POI039",
+  "name": "신림역",
+  "category": "인구밀집지역"
+ },
+ "신촌·이대역": {
+  "code": "POI040",
+  "name": "신촌·이대역",
+  "category": "인구밀집지역"
+ },
+ "신촌": {
+  "code": "POI040",
+  "name": "신촌·이대역",
+  "category": "인구밀집지역"
+ },
+ "이대역": {
+  "code": "POI040",
+  "name": "신촌·이대역",
+  "category": "인구밀집지역"
+ },
+ "sinchon·ewha womans university station": {
+  "code": "POI040",
+  "name": "신촌·이대역",
+  "category": "인구밀집지역"
+ },
+ "양재역": {
+  "code": "POI041",
+  "name": "양재역",
+  "category": "인구밀집지역"
+ },
+ "양재": {
+  "code": "POI041",
+  "name": "양재역",
+  "category": "인구밀집지역"
+ },
+ "yangjae station": {
+  "code": "POI041",
+  "name": "양재역",
+  "category": "인구밀집지역"
+ },
+ "역삼역": {
+  "code": "POI042",
+  "name": "역삼역",
+  "category": "인구밀집지역"
+ },
+ "역삼": {
+  "code": "POI042",
+  "name": "역삼역",
+  "category": "인구밀집지역"
+ },
+ "yeoksam station": {
+  "code": "POI042",
+  "name": "역삼역",
+  "category": "인구밀집지역"
+ },
+ "연신내역": {
+  "code": "POI043",
+  "name": "연신내역",
+  "category": "인구밀집지역"
+ },
+ "연신내": {
+  "code": "POI043",
+  "name": "연신내역",
+  "category": "인구밀집지역"
+ },
+ "yeonsinnae station": {
+  "code": "POI043",
+  "name": "연신내역",
+  "category": "인구밀집지역"
+ },
+ "오목교역·목동운동장": {
+  "code": "POI044",
+  "name": "오목교역·목동운동장",
+  "category": "인구밀집지역"
+ },
+ "오목교역": {
+  "code": "POI044",
+  "name": "오목교역·목동운동장",
+  "category": "인구밀집지역"
+ },
+ "목동운동장": {
+  "code": "POI044",
+  "name": "오목교역·목동운동장",
+  "category": "인구밀집지역"
+ },
+ "omokgyo·mok-dong stadium station": {
+  "code": "POI044",
+  "name": "오목교역·목동운동장",
+  "category": "인구밀집지역"
+ },
+ "왕십리역": {
+  "code": "POI045",
+  "name": "왕십리역",
+  "category": "인구밀집지역"
+ },
+ "왕십리": {
+  "code": "POI045",
+  "name": "왕십리역",
+  "category": "인구밀집지역"
+ },
+ "wangsimni station": {
+  "code": "POI045",
+  "name": "왕십리역",
+  "category": "인구밀집지역"
+ },
+ "용산역": {
+  "code": "POI046",
+  "name": "용산역",
+  "category": "인구밀집지역"
+ },
+ "용산": {
+  "code": "POI046",
+  "name": "용산역",
+  "category": "인구밀집지역"
+ },
+ "yongsan station": {
+  "code": "POI046",
+  "name": "용산역",
+  "category": "인구밀집지역"
+ },
+ "이태원역": {
+  "code": "POI047",
+  "name": "이태원역",
+  "category": "인구밀집지역"
+ },
+ "이태원": {
+  "code": "POI047",
+  "name": "이태원역",
+  "category": "인구밀집지역"
+ },
+ "itaewon station": {
+  "code": "POI047",
+  "name": "이태원역",
+  "category": "인구밀집지역"
+ },
+ "장지역": {
+  "code": "POI048",
+  "name": "장지역",
+  "category": "인구밀집지역"
+ },
+ "장지": {
+  "code": "POI048",
+  "name": "장지역",
+  "category": "인구밀집지역"
+ },
+ "jangji station": {
+  "code": "POI048",
+  "name": "장지역",
+  "category": "인구밀집지역"
+ },
+ "장한평역": {
+  "code": "POI049",
+  "name": "장한평역",
+  "category": "인구밀집지역"
+ },
+ "장한평": {
+  "code": "POI049",
+  "name": "장한평역",
+  "category": "인구밀집지역"
+ },
+ "janghanpyeong station": {
+  "code": "POI049",
+  "name": "장한평역",
+  "category": "인구밀집지역"
+ },
+ "천호역": {
+  "code": "POI050",
+  "name": "천호역",
+  "category": "인구밀집지역"
+ },
+ "천호": {
+  "code": "POI050",
+  "name": "천호역",
+  "category": "인구밀집지역"
+ },
+ "cheonho station": {
+  "code": "POI050",
+  "name": "천호역",
+  "category": "인구밀집지역"
+ },
+ "총신대입구(이수)역": {
+  "code": "POI051",
+  "name": "총신대입구(이수)역",
+  "category": "인구밀집지역"
+ },
+ "이수역": {
+  "code": "POI051",
+  "name": "총신대입구(이수)역",
+  "category": "인구밀집지역"
+ },
+ "이수": {
+  "code": "POI051",
+  "name": "총신대입구(이수)역",
+  "category": "인구밀집지역"
+ },
+ "chongshin university(isu) station": {
+  "code": "POI051",
+  "name": "총신대입구(이수)역",
+  "category": "인구밀집지역"
+ },
+ "충정로역": {
+  "code": "POI052",
+  "name": "충정로역",
+  "category": "인구밀집지역"
+ },
+ "충정로": {
+  "code": "POI052",
+  "name": "충정로역",
+  "category": "인구밀집지역"
+ },
+ "chungjeongno station": {
+  "code": "POI052",
+  "name": "충정로역",
+  "category": "인구밀집지역"
+ },
+ "합정역": {
+  "code": "POI053",
+  "name": "합정역",
+  "category": "인구밀집지역"
+ },
+ "합정": {
+  "code": "POI053",
+  "name": "합정역",
+  "category": "인구밀집지역"
+ },
+ "hapjeong station": {
+  "code": "POI053",
+  "name": "합정역",
+  "category": "인구밀집지역"
+ },
+ "혜화역": {
+  "code": "POI054",
+  "name": "혜화역",
+  "category": "인구밀집지역"
+ },
+ "혜화": {
+  "code": "POI054",
+  "name": "혜화역",
+  "category": "인구밀집지역"
+ },
+ "hyehwa station": {
+  "code": "POI054",
+  "name": "혜화역",
+  "category": "인구밀집지역"
+ },
+ "홍대입구역(2호선)": {
+  "code": "POI055",
+  "name": "홍대입구역(2호선)",
+  "category": "인구밀집지역"
+ },
+ "홍대입구역": {
+  "code": "POI055",
+  "name": "홍대입구역(2호선)",
+  "category": "인구밀집지역"
+ },
+ "hongik university station(line 2)": {
+  "code": "POI055",
+  "name": "홍대입구역(2호선)",
+  "category": "인구밀집지역"
+ },
+ "회기역": {
+  "code": "POI056",
+  "name": "회기역",
+  "category": "인구밀집지역"
+ },
+ "회기": {
+  "code": "POI056",
+  "name": "회기역",
+  "category": "인구밀집지역"
+ },
+ "hoegi station": {
+  "code": "POI056",
+  "name": "회기역",
+  "category": "인구밀집지역"
+ },
+ "가락시장": {
+  "code": "POI058",
+  "name": "가락시장",
+  "category": "발달상권"
+ },
+ "garak market": {
+  "code": "POI058",
+  "name": "가락시장",
+  "category": "발달상권"
+ },
+ "가로수길": {
+  "code": "POI059",
+  "name": "가로수길",
+  "category": "발달상권"
+ },
+ "garosu-gil": {
+  "code": "POI059",
+  "name": "가로수길",
+  "category": "발달상권"
+ },
+ "광장(전통)시장": {
+  "code": "POI060",
+  "name": "광장(전통)시장",
+  "category": "발달상권"
+ },
+ "전통시장": {
+  "code": "POI060",
+  "name": "광장(전통)시장",
+  "category": "발달상권"
+ },
+ "전통": {
+  "code": "POI060",
+  "name": "광장(전통)시장",
+  "category": "발달상권"
+ },
+ "gwangjang(traditional) market": {
+  "code": "POI060",
+  "name": "광장(전통)시장",
+  "category": "발달상권"
+ },
+ "김포공항": {
+  "code": "POI061",
+  "name": "김포공항",
+  "category": "발달상권"
+ },
+ "gimpo airport": {
+  "code": "POI061",
+  "name": "김포공항",
+  "category": "발달상권"
+ },
+ "노량진": {
+  "code": "POI063",
+  "name": "노량진",
+  "category": "발달상권"
+ },
+ "noryangjin": {
+  "code": "POI063",
+  "name": "노량진",
+  "category": "발달상권"
+ },
+ "덕수궁길·정동길": {
+  "code": "POI064",
+  "name": "덕수궁길·정동길",
+  "category": "발달상권"
+ },
+ "덕수궁길": {
+  "code": "POI064",
+  "name": "덕수궁길·정동길",
+  "category": "발달상권"
+ },
+ "정동길": {
+  "code": "POI064",
+  "name": "덕수궁길·정동길",
+  "category": "발달상권"
+ },
+ "deoksugung-gil·jeongdong-gil": {
+  "code": "POI064",
+  "name": "덕수궁길·정동길",
+  "category": "발달상권"
+ },
+ "북촌한옥마을": {
+  "code": "POI066",
+  "name": "북촌한옥마을",
+  "category": "발달상권"
+ },
+ "bukchon hanok village": {
+  "code": "POI066",
+  "name": "북촌한옥마을",
+  "category": "발달상권"
+ },
+ "서촌": {
+  "code": "POI067",
+  "name": "서촌",
+  "category": "발달상권"
+ },
+ "seochon": {
+  "code": "POI067",
+  "name": "서촌",
+  "category": "발달상권"
+ },
+ "성수카페거리": {
+  "code": "POI068",
+  "name": "성수카페거리",
+  "category": "발달상권"
+ },
+ "seongsu cafe street": {
+  "code": "POI068",
+  "name": "성수카페거리",
+  "category": "발달상권"
+ },
+ "쌍문역": {
+  "code": "POI070",
+  "name": "쌍문역",
+  "category": "인구밀집지역"
+ },
+ "쌍문": {
+  "code": "POI070",
+  "name": "쌍문역",
+  "category": "인구밀집지역"
+ },
+ "ssangmun-dong station": {
+  "code": "POI070",
+  "name": "쌍문역",
+  "category": "인구밀집지역"
+ },
+ "압구정로데오거리": {
+  "code": "POI071",
+  "name": "압구정로데오거리",
+  "category": "발달상권"
+ },
+ "apgujeong rodeo street": {
+  "code": "POI071",
+  "name": "압구정로데오거리",
+  "category": "발달상권"
+ },
+ "여의도": {
+  "code": "POI072",
+  "name": "여의도",
+  "category": "발달상권"
+ },
+ "yeouido": {
+  "code": "POI072",
+  "name": "여의도",
+  "category": "발달상권"
+ },
+ "연남동": {
+  "code": "POI073",
+  "name": "연남동",
+  "category": "발달상권"
+ },
+ "yeonnam-dong": {
+  "code": "POI073",
+  "name": "연남동",
+  "category": "발달상권"
+ },
+ "영등포 타임스퀘어": {
+  "code": "POI074",
+  "name": "영등포 타임스퀘어",
+  "category": "발달상권"
+ },
+ "yeongdeungpo time square": {
+  "code": "POI074",
+  "name": "영등포 타임스퀘어",
+  "category": "발달상권"
+ },
+ "용리단길": {
+  "code": "POI076",
+  "name": "용리단길",
+  "category": "발달상권"
+ },
+ "yongnidan-gil": {
+  "code": "POI076",
+  "name": "용리단길",
+  "category": "발달상권"
+ },
+ "이태원 앤틱가구거리": {
+  "code": "POI077",
+  "name": "이태원 앤틱가구거리",
+  "category": "발달상권"
+ },
+ "itaewon antiques street": {
+  "code": "POI077",
+  "name": "이태원 앤틱가구거리",
+  "category": "발달상권"
+ },
+ "인사동": {
+  "code": "POI078",
+  "name": "인사동",
+  "category": "발달상권"
+ },
+ "insa-dong": {
+  "code": "POI078",
+  "name": "인사동",
+  "category": "발달상권"
+ },
+ "창동 신경제 중심지": {
+  "code": "POI079",
+  "name": "창동 신경제 중심지",
+  "category": "발달상권"
+ },
+ "changdong new economic center": {
+  "code": "POI079",
+  "name": "창동 신경제 중심지",
+  "category": "발달상권"
+ },
+ "청담동 명품거리": {
+  "code": "POI080",
+  "name": "청담동 명품거리",
+  "category": "발달상권"
+ },
+ "cheongdam-dong luxury fashion street": {
+  "code": "POI080",
+  "name": "청담동 명품거리",
+  "category": "발달상권"
+ },
+ "청량리 제기동 일대 전통시장": {
+  "code": "POI081",
+  "name": "청량리 제기동 일대 전통시장",
+  "category": "발달상권"
+ },
+ "traditional market in cheongnyangni jegi-dong": {
+  "code": "POI081",
+  "name": "청량리 제기동 일대 전통시장",
+  "category": "발달상권"
+ },
+ "해방촌·경리단길": {
+  "code": "POI082",
+  "name": "해방촌·경리단길",
+  "category": "발달상권"
+ },
+ "해방촌": {
+  "code": "POI082",
+  "name": "해방촌·경리단길",
+  "category": "발달상권"
+ },
+ "경리단길": {
+  "code": "POI082",
+  "name": "해방촌·경리단길",
+  "category": "발달상권"
+ },
+ "haebangchon·gyeongnidan-gil": {
+  "code": "POI082",
+  "name": "해방촌·경리단길",
+  "category": "발달상권"
+ },
+ "DDP(동대문디자인플라자)": {
+  "code": "POI083",
+  "name": "DDP(동대문디자인플라자)",
+  "category": "발달상권"
+ },
+ "DDP": {
+  "code": "POI083",
+  "name": "DDP(동대문디자인플라자)",
+  "category": "발달상권"
+ },
+ "ddp(dongdaemun design plaza)": {
+  "code": "POI083",
+  "name": "DDP(동대문디자인플라자)",
+  "category": "발달상권"
+ },
+ "DMC(디지털미디어시티)": {
+  "code": "POI084",
+  "name": "DMC(디지털미디어시티)",
+  "category": "발달상권"
+ },
+ "DMC": {
+  "code": "POI084",
+  "name": "DMC(디지털미디어시티)",
+  "category": "발달상권"
+ },
+ "dmc(digital media city)": {
+  "code": "POI084",
+  "name": "DMC(디지털미디어시티)",
+  "category": "발달상권"
+ },
+ "강서한강공원": {
+  "code": "POI085",
+  "name": "강서한강공원",
+  "category": "공원"
+ },
+ "gangseo hangang park": {
+  "code": "POI085",
+  "name": "강서한강공원",
+  "category": "공원"
+ },
+ "고척돔": {
+  "code": "POI086",
+  "name": "고척돔",
+  "category": "공원"
+ },
+ "gocheok dome": {
+  "code": "POI086",
+  "name": "고척돔",
+  "category": "공원"
+ },
+ "광나루한강공원": {
+  "code": "POI087",
+  "name": "광나루한강공원",
+  "category": "공원"
+ },
+ "gwangnaru hangang park": {
+  "code": "POI087",
+  "name": "광나루한강공원",
+  "category": "공원"
+ },
+ "광화문광장": {
+  "code": "POI088",
+  "name": "광화문광장",
+  "category": "공원"
+ },
+ "gwanghwamun square": {
+  "code": "POI088",
+  "name": "광화문광장",
+  "category": "공원"
+ },
+ "국립중앙박물관·용산가족공원": {
+  "code": "POI089",
+  "name": "국립중앙박물관·용산가족공원",
+  "category": "공원"
+ },
+ "국립중앙박물관": {
+  "code": "POI089",
+  "name": "국립중앙박물관·용산가족공원",
+  "category": "공원"
+ },
+ "용산가족공원": {
+  "code": "POI089",
+  "name": "국립중앙박물관·용산가족공원",
+  "category": "공원"
+ },
+ "the national museum of korea·yongsan family park": {
+  "code": "POI089",
+  "name": "국립중앙박물관·용산가족공원",
+  "category": "공원"
+ },
+ "난지한강공원": {
+  "code": "POI090",
+  "name": "난지한강공원",
+  "category": "공원"
+ },
+ "nanji hangang park": {
+  "code": "POI090",
+  "name": "난지한강공원",
+  "category": "공원"
+ },
+ "남산공원": {
+  "code": "POI091",
+  "name": "남산공원",
+  "category": "공원"
+ },
+ "namsan park": {
+  "code": "POI091",
+  "name": "남산공원",
+  "category": "공원"
+ },
+ "노들섬": {
+  "code": "POI092",
+  "name": "노들섬",
+  "category": "공원"
+ },
+ "nodeul island": {
+  "code": "POI092",
+  "name": "노들섬",
+  "category": "공원"
+ },
+ "뚝섬한강공원": {
+  "code": "POI093",
+  "name": "뚝섬한강공원",
+  "category": "공원"
+ },
+ "ttukseom hangang park": {
+  "code": "POI093",
+  "name": "뚝섬한강공원",
+  "category": "공원"
+ },
+ "망원한강공원": {
+  "code": "POI094",
+  "name": "망원한강공원",
+  "category": "공원"
+ },
+ "mangwon hangang park": {
+  "code": "POI094",
+  "name": "망원한강공원",
+  "category": "공원"
+ },
+ "반포한강공원": {
+  "code": "POI095",
+  "name": "반포한강공원",
+  "category": "공원"
+ },
+ "banpo hangang park": {
+  "code": "POI095",
+  "name": "반포한강공원",
+  "category": "공원"
+ },
+ "북서울꿈의숲": {
+  "code": "POI096",
+  "name": "북서울꿈의숲",
+  "category": "공원"
+ },
+ "dream forest": {
+  "code": "POI096",
+  "name": "북서울꿈의숲",
+  "category": "공원"
+ },
+ "서리풀공원·몽마르뜨공원": {
+  "code": "POI098",
+  "name": "서리풀공원·몽마르뜨공원",
+  "category": "공원"
+ },
+ "서리풀공원": {
+  "code": "POI098",
+  "name": "서리풀공원·몽마르뜨공원",
+  "category": "공원"
+ },
+ "몽마르뜨공원": {
+  "code": "POI098",
+  "name": "서리풀공원·몽마르뜨공원",
+  "category": "공원"
+ },
+ "seoripul park·montmartre park": {
+  "code": "POI098",
+  "name": "서리풀공원·몽마르뜨공원",
+  "category": "공원"
+ },
+ "서울대공원": {
+  "code": "POI100",
+  "name": "서울대공원",
+  "category": "공원"
+ },
+ "seoul grand park": {
+  "code": "POI100",
+  "name": "서울대공원",
+  "category": "공원"
+ },
+ "서울숲공원": {
+  "code": "POI101",
+  "name": "서울숲공원",
+  "category": "공원"
+ },
+ "seoul forest": {
+  "code": "POI101",
+  "name": "서울숲공원",
+  "category": "공원"
+ },
+ "아차산": {
+  "code": "POI102",
+  "name": "아차산",
+  "category": "공원"
+ },
+ "achasan": {
+  "code": "POI102",
+  "name": "아차산",
+  "category": "공원"
+ },
+ "양화한강공원": {
+  "code": "POI103",
+  "name": "양화한강공원",
+  "category": "공원"
+ },
+ "yanghwa hangang park": {
+  "code": "POI103",
+  "name": "양화한강공원",
+  "category": "공원"
+ },
+ "어린이대공원": {
+  "code": "POI104",
+  "name": "어린이대공원",
+  "category": "공원"
+ },
+ "children's grand park": {
+  "code": "POI104",
+  "name": "어린이대공원",
+  "category": "공원"
+ },
+ "여의도한강공원": {
+  "code": "POI105",
+  "name": "여의도한강공원",
+  "category": "공원"
+ },
+ "yeouido hangang park": {
+  "code": "POI105",
+  "name": "여의도한강공원",
+  "category": "공원"
+ },
+ "월드컵공원": {
+  "code": "POI106",
+  "name": "월드컵공원",
+  "category": "공원"
+ },
+ "world cup park": {
+  "code": "POI106",
+  "name": "월드컵공원",
+  "category": "공원"
+ },
+ "응봉산": {
+  "code": "POI107",
+  "name": "응봉산",
+  "category": "공원"
+ },
+ "eungbongsan": {
+  "code": "POI107",
+  "name": "응봉산",
+  "category": "공원"
+ },
+ "이촌한강공원": {
+  "code": "POI108",
+  "name": "이촌한강공원",
+  "category": "공원"
+ },
+ "ichon hangang park": {
+  "code": "POI108",
+  "name": "이촌한강공원",
+  "category": "공원"
+ },
+ "잠실종합운동장": {
+  "code": "POI109",
+  "name": "잠실종합운동장",
+  "category": "공원"
+ },
+ "jamsil (seoul) sports complex": {
+  "code": "POI109",
+  "name": "잠실종합운동장",
+  "category": "공원"
+ },
+ "잠실한강공원": {
+  "code": "POI110",
+  "name": "잠실한강공원",
+  "category": "공원"
+ },
+ "jamsil hangang park": {
+  "code": "POI110",
+  "name": "잠실한강공원",
+  "category": "공원"
+ },
+ "잠원한강공원": {
+  "code": "POI111",
+  "name": "잠원한강공원",
+  "category": "공원"
+ },
+ "jamwon hangang park": {
+  "code": "POI111",
+  "name": "잠원한강공원",
+  "category": "공원"
+ },
+ "청계산": {
+  "code": "POI112",
+  "name": "청계산",
+  "category": "공원"
+ },
+ "cheonggyesan": {
+  "code": "POI112",
+  "name": "청계산",
+  "category": "공원"
+ },
+ "북창동 먹자골목": {
+  "code": "POI114",
+  "name": "북창동 먹자골목",
+  "category": "발달상권"
+ },
+ "bukchang-dong food alley": {
+  "code": "POI114",
+  "name": "북창동 먹자골목",
+  "category": "발달상권"
+ },
+ "남대문시장": {
+  "code": "POI115",
+  "name": "남대문시장",
+  "category": "발달상권"
+ },
+ "namdaemun market": {
+  "code": "POI115",
+  "name": "남대문시장",
+  "category": "발달상권"
+ },
+ "익선동": {
+  "code": "POI116",
+  "name": "익선동",
+  "category": "발달상권"
+ },
+ "ikseon-dong": {
+  "code": "POI116",
+  "name": "익선동",
+  "category": "발달상권"
+ },
+ "신정네거리역": {
+  "code": "POI117",
+  "name": "신정네거리역",
+  "category": "인구밀집지역"
+ },
+ "신정네거리": {
+  "code": "POI117",
+  "name": "신정네거리역",
+  "category": "인구밀집지역"
+ },
+ "shinjeongnegeori station": {
+  "code": "POI117",
+  "name": "신정네거리역",
+  "category": "인구밀집지역"
+ },
+ "잠실새내역": {
+  "code": "POI118",
+  "name": "잠실새내역",
+  "category": "인구밀집지역"
+ },
+ "잠실새내": {
+  "code": "POI118",
+  "name": "잠실새내역",
+  "category": "인구밀집지역"
+ },
+ "jamsil saenae station": {
+  "code": "POI118",
+  "name": "잠실새내역",
+  "category": "인구밀집지역"
+ },
+ "잠실역": {
+  "code": "POI119",
+  "name": "잠실역",
+  "category": "인구밀집지역"
+ },
+ "잠실": {
+  "code": "POI119",
+  "name": "잠실역",
+  "category": "인구밀집지역"
+ },
+ "jamsil station": {
+  "code": "POI119",
+  "name": "잠실역",
+  "category": "인구밀집지역"
+ },
+ "잠실롯데타워·석촌호수": {
+  "code": "POI120",
+  "name": "잠실롯데타워·석촌호수",
+  "category": "발달상권"
+ },
+ "잠실롯데타워": {
+  "code": "POI120",
+  "name": "잠실롯데타워·석촌호수",
+  "category": "발달상권"
+ },
+ "석촌호수": {
+  "code": "POI120",
+  "name": "잠실롯데타워·석촌호수",
+  "category": "발달상권"
+ },
+ "jamsil lotte tower·seokchonhosulake": {
+  "code": "POI120",
+  "name": "잠실롯데타워·석촌호수",
+  "category": "발달상권"
+ },
+ "송리단길·호수단길": {
+  "code": "POI121",
+  "name": "송리단길·호수단길",
+  "category": "발달상권"
+ },
+ "송리단길": {
+  "code": "POI121",
+  "name": "송리단길·호수단길",
+  "category": "발달상권"
+ },
+ "호수단길": {
+  "code": "POI121",
+  "name": "송리단길·호수단길",
+  "category": "발달상권"
+ },
+ "songridan-gil·hosudan-gil": {
+  "code": "POI121",
+  "name": "송리단길·호수단길",
+  "category": "발달상권"
+ },
+ "신촌 스타광장": {
+  "code": "POI122",
+  "name": "신촌 스타광장",
+  "category": "발달상권"
+ },
+ "shinchon star plaza": {
+  "code": "POI122",
+  "name": "신촌 스타광장",
+  "category": "발달상권"
+ },
+ "보라매공원": {
+  "code": "POI123",
+  "name": "보라매공원",
+  "category": "공원"
+ },
+ "boramae park": {
+  "code": "POI123",
+  "name": "보라매공원",
+  "category": "공원"
+ },
+ "서대문독립공원": {
+  "code": "POI124",
+  "name": "서대문독립공원",
+  "category": "공원"
+ },
+ "seodaemun independence park": {
+  "code": "POI124",
+  "name": "서대문독립공원",
+  "category": "공원"
+ },
+ "안양천": {
+  "code": "POI125",
+  "name": "안양천",
+  "category": "공원"
+ },
+ "anyangcheon river": {
+  "code": "POI125",
+  "name": "안양천",
+  "category": "공원"
+ },
+ "여의서로": {
+  "code": "POI126",
+  "name": "여의서로",
+  "category": "공원"
+ },
+ "yeouiseoro": {
+  "code": "POI126",
+  "name": "여의서로",
+  "category": "공원"
+ },
+ "올림픽공원": {
+  "code": "POI127",
+  "name": "올림픽공원",
+  "category": "공원"
+ },
+ "olympic park": {
+  "code": "POI127",
+  "name": "올림픽공원",
+  "category": "공원"
+ },
+ "홍제폭포": {
+  "code": "POI128",
+  "name": "홍제폭포",
+  "category": "공원"
+ },
+ "hongje waterfall": {
+  "code": "POI128",
+  "name": "홍제폭포",
+  "category": "공원"
+ },
+ "송현녹지광장": {
+  "code": "POI129",
+  "name": "송현녹지광장",
+  "category": "공원"
+ },
+ "songhyeon green plaza": {
+  "code": "POI129",
+  "name": "송현녹지광장",
+  "category": "공원"
+ },
+ "시의회 앞": {
+  "code": "POI130",
+  "name": "시의회 앞",
+  "category": "인구밀집지역"
+ },
+ "city council": {
+  "code": "POI130",
+  "name": "시의회 앞",
+  "category": "인구밀집지역"
+ },
+ "숭례문": {
+  "code": "POI131",
+  "name": "숭례문",
+  "category": "인구밀집지역"
+ },
+ "sungnyemun gate": {
+  "code": "POI131",
+  "name": "숭례문",
+  "category": "인구밀집지역"
+ }
+}

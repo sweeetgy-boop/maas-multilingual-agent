@@ -49,7 +49,11 @@ Classify the user message. Respond with JSON only. No explanation, no markdown.
 - pii_spans: copy the exact substring found in the message.
 - origin/destination/datetime: copy the phrase from the message, or "" if absent.
 - pax: number of travellers, 0 if not stated.
-- pii: comma-separated from PASSPORT,PHONE,EMAIL,CARD,NAME,ADDRESS. Empty string if none."""
+- pii: comma-separated from PASSPORT,PHONE,EMAIL,CARD,NAME,ADDRESS. Empty string if none.
+- search_parking = parking for the user's OWN car (주차장, parking, parkir). NOT share_mobility.
+- search_ev_charger = electric vehicle charging stations (충전소, EV charger, pengisian).
+  NOT share_mobility.
+- share_mobility = shared/rented bikes, scooters, cars (따릉이, 카셰어링, bike share)."""
 
 SCHEMA = {
     "type": "object",
@@ -62,7 +66,8 @@ SCHEMA = {
         "intent": {"type": "string",
                    "enum": ["search_rail", "search_bus", "search_flight", "search_lodging",
                             "share_mobility", "plan_journey", "get_realtime_status",
-                            "fare_policy", "smalltalk", "other"]},
+                            "fare_policy", "search_parking", "search_ev_charger",
+                            "smalltalk", "other"]},
         "origin": {"type": "string"},
         "destination": {"type": "string"},
         "datetime": {"type": "string"},
