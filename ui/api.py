@@ -147,7 +147,7 @@ def run(text: str, session_id: str | None = None) -> tuple[dict, str, list[str]]
     def patched(intent, slots):
         nonlocal carried
         merged, carried = merge_slots(slots, sess["slots"])
-        return orig(intent, merged)
+        return orig(intent, merged, carried=carried)
 
     pipeline.tools.call_tool = patched
     try:
