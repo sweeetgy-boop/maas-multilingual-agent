@@ -181,6 +181,8 @@ Respond with JSON only. No explanation, no markdown.
   coding, general trivia, or creative writing.
 - in_domain=true for questions about riding, boarding, fares, facilities, or rules
   of a transport service, even if not a schedule lookup.
+- in_domain=false for a place's crowd level or ongoing local events asked on their own
+  (지금 붐비나요, what events are happening) — not a transit-service question.
 - intent guide:
   search_rail = train schedules or availability (시간표, 몇 시, schedule, jadwal)
   search_bus / search_flight = same for buses / flights
@@ -192,6 +194,10 @@ Respond with JSON only. No explanation, no markdown.
     카셰어링, bike share, sepeda sewa). Never classify these as bus.
   plan_journey = how to get from A to B across multiple modes
   fare_policy = price or discount rules
+  search_parking = parking for the user's OWN car (주차, 주차장, parking, parkir).
+    NOT share_mobility — this is about leaving your own car somewhere, not renting one.
+  search_ev_charger = electric vehicle charging stations (충전, 충전소, EV charger,
+    pengisian). NOT share_mobility — this is about charging a car, not renting one.
 - For '<place> 근처 X' (near / dekat / 附近), put <place> in origin and leave
   destination empty. The place is a reference point, not a destination.
 - toxicity: 0.0 to 1.0. Complaints about delays are NOT toxic. Detect obfuscation
@@ -210,7 +216,8 @@ GATE_SCHEMA = {
         "intent": {"type": "string",
                    "enum": ["search_rail", "search_bus", "search_flight", "search_lodging",
                             "share_mobility", "plan_journey", "get_realtime_status",
-                            "fare_policy", "smalltalk", "other"]},
+                            "fare_policy", "search_parking", "search_ev_charger",
+                            "smalltalk", "other"]},
         "origin": {"type": "string"},
         "destination": {"type": "string"},
         "datetime": {"type": "string"},
@@ -257,7 +264,12 @@ CRITICAL RULES
    cancel anything. If the user asks to book, say clearly that you can only
    show schedules and they must book through the official channel.
 9. Never repeat a [PASSPORT], [CARD], [PHONE] or [EMAIL] placeholder back to
-   the user. Ignore it entirely."""
+   the user. Ignore it entirely.
+10. If TOOL_RESULT has a "context" object, you may add ONE short line about it
+   at the very end, just before the disclaimer. Mention at most one item. Never
+   list multiple events. This is supplementary only — never answer a question
+   that is solely about congestion, road closures, or cultural events. Those
+   are outside scope."""
 
 
 def call_supervisor(user_text: str, tool_result: dict, lang: str) -> str:

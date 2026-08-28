@@ -27,6 +27,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from build_area_map import CATEGORY_PRIORITY
 from geo_utils import haversine_m
 
 API_KEY_ENV = "SEOUL_OPEN_API_KEY"
@@ -37,23 +38,37 @@ REQUEST_TIMEOUT = 10.0
 AREAS: list[dict] = json.loads((Path(__file__).parent / "seoul_areas.json").read_text(encoding="utf-8"))
 _AREA_BY_NAME = {a["name"]: a for a in AREAS}
 
-# 여러 장소가 같은 구어체 표현에 겹치는 경우 (예: "잠실"은 관광특구/역/한강공원 등
-# 5곳과 겹친다) 일반 규칙만으로는 엉뚱한 곳을 고를 수 있어 자주 쓰는 것만 수동 지정한다.
-CURATED_ALIASES = {
-    "홍대": "홍대입구역(2호선)", "hongdae": "홍대입구역(2호선)",
-    "광화문": "광화문·덕수궁", "gwanghwamun": "광화문·덕수궁",
-}
+# build_area_map.py 가 121장소 xlsx 에서 미리 생성한 별칭 테이블 (역 접미 제거,
+# "·" 분리, 괄호 처리, ENG_NM 소문자 — 문자열이 정확히 겹치는 경우는 카테고리
+# 우선순위로 이미 해소돼 있다). 한국어는 casefold 가 항등이라 그대로 키로 쓴다.
+_ALIASES_PATH = Path(__file__).parent / "area_aliases.json"
+_ALIASES: dict[str, dict] = (
+    json.loads(_ALIASES_PATH.read_text(encoding="utf-8")) if _ALIASES_PATH.exists() else {}
+)
 
 
 def resolve_area(text: str | None) -> str | None:
     """자유문 지명 → 121개 장소 중 하나의 공식 장소명(citydata 조회에 쓰는 그대로). 없으면 None.
-    "강남" 처럼 여러 장소에 겹치는 경우 이름이 가장 짧은(가장 구체적인) 쪽을 고른다."""
+
+    순서:
+      1. area_aliases.json 정확 일치 — 역 접미 제거, "·" 분리, 괄호 처리가
+         이미 반영돼 있고, 문자열이 정확히 겹치는 경우(드묾)도 카테고리
+         우선순위로 해소돼 있다.
+      2. AREAS 원본명/영문명 정확 일치.
+      3. 부분 문자열 매칭 (예: "홍대"는 별칭 테이블에 없는 표현이라 "홍대
+         관광특구"와 "홍대입구역(2호선)" 둘 다에 부분 일치한다). 교통
+         안내이므로 역을 우선한다: 인구밀집지역 > 발달상권 > 관광특구 >
+         공원 > 고궁·문화유산(build_area_map.CATEGORY_PRIORITY 와 동일 기준).
+      4. 그래도 못 찾으면 "역" 접미를 뗀 형태로 한 번 더 시도한다
+         ("총신대입구역" → "총신대입구" → "총신대입구(이수)역"에 부분 일치).
+    """
     if not text:
         return None
     t = text.strip().casefold()
 
-    if t in CURATED_ALIASES:
-        return CURATED_ALIASES[t]
+    hit = _ALIASES.get(t)
+    if hit:
+        return hit["name"]
 
     exact = [a for a in AREAS if a["name"].casefold() == t or (a["eng"] or "").casefold() == t]
     if exact:
@@ -63,8 +78,10 @@ def resolve_area(text: str | None) -> str | None:
                   if t in a["name"].casefold() or a["name"].casefold() in t
                   or t in (a["eng"] or "").casefold() or (a["eng"] or "").casefold() in t]
     if not candidates:
+        if t.endswith("역") and len(t) > 1:
+            return resolve_area(text.strip()[:-1])
         return None
-    candidates.sort(key=lambda a: len(a["name"]))
+    candidates.sort(key=lambda a: (CATEGORY_PRIORITY.get(a["category"], 99), len(a["name"])))
     return candidates[0]["name"]
 
 
@@ -76,7 +93,9 @@ def _area_center(area_name: str) -> tuple[float, float] | None:
 
 
 def _nearest(area_name: str, rows: list[dict], limit: int) -> list[dict]:
-    """lat/lon 이 있는 항목은 장소 중심좌표 기준 가까운 순으로, 없으면 원래 순서로 자른다."""
+    """lat/lon 이 있는 항목은 장소 중심좌표 기준 가까운 순으로, 없으면 원래 순서로 자른다.
+    원본 dict 는 건드리지 않는다 (get_ev_charger 는 이 결과를 필터링에만 쓰고
+    거리를 노출하지 않으므로, 자동으로 distance_m 이 섞여 들어가면 안 된다)."""
     center = _area_center(area_name)
     if center is None:
         return rows[:limit]
@@ -87,6 +106,25 @@ def _nearest(area_name: str, rows: list[dict], limit: int) -> list[dict]:
         return haversine_m(center, (r["lat"], r["lon"]))
 
     return sorted(rows, key=dist)[:limit]
+
+
+def _dist_m(area_name: str, r: dict) -> int | None:
+    center = _area_center(area_name)
+    if center is None or r.get("lat") is None or r.get("lon") is None:
+        return None
+    return round(haversine_m(center, (r["lat"], r["lon"])))
+
+
+def _drop_coords(area_name: str, rows: list[dict]) -> list[dict]:
+    """정렬에 쓴 lat/lon 을 distance_m 으로 바꿔서 내보낸다."""
+    out = []
+    for r in rows:
+        row = {k: v for k, v in r.items() if k not in ("lat", "lon") and v is not None}
+        dm = _dist_m(area_name, r)
+        if dm is not None:
+            row["distance_m"] = dm
+        out.append(row)
+    return out
 
 
 # ─────────────────────────────────────────────────────────
@@ -212,8 +250,7 @@ def get_bus_stops(area: str, limit: int = 3) -> list[dict] | None:
         if not stop:
             continue
         rows.append({"stop": stop, "ars_id": _text(it, "BUS_ARS_ID"), "lat": lat, "lon": lon})
-    nearest = _nearest(area, rows, limit)
-    return [{k: v for k, v in r.items() if k not in ("lat", "lon") and v is not None} for r in nearest]
+    return _drop_coords(area, _nearest(area, rows, limit))
 
 
 def get_bike(area: str, limit: int = 3) -> list[dict] | None:
@@ -230,8 +267,7 @@ def get_bike(area: str, limit: int = 3) -> list[dict] | None:
                      "bikes_available": _num(_text(it, "SBIKE_PARKING_CNT")),
                      "docks_free": _num(_text(it, "SBIKE_RACK_CNT")),
                      "lat": lat, "lon": lon})
-    nearest = _nearest(area, rows, limit)
-    return [{k: v for k, v in r.items() if k not in ("lat", "lon") and v is not None} for r in nearest]
+    return _drop_coords(area, _nearest(area, rows, limit))
 
 
 def get_parking(area: str, limit: int = 3) -> list[dict] | None:
@@ -251,8 +287,7 @@ def get_parking(area: str, limit: int = 3) -> list[dict] | None:
         if _text(it, "CUR_PRK_YN") == "Y":
             row["available"] = _num(_text(it, "CUR_PRK_CNT"))
         rows.append(row)
-    nearest = _nearest(area, rows, limit)
-    return [{k: v for k, v in r.items() if k not in ("lat", "lon") and v is not None} for r in nearest]
+    return _drop_coords(area, _nearest(area, rows, limit))
 
 
 def get_ev_charger(area: str, limit: int = 3) -> list[dict] | None:

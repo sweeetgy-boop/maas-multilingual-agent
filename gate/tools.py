@@ -15,8 +15,11 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+import citydata_api
 from geocode import geocode
 from transit_nodes import NODE_BY_ID, find_access_points
+
+COVERED_AREA_LABEL = "서울 주요 121개 장소"
 
 # ── 지명 정규화 사전 (다국어 별칭 → 표준 ID) ──
 # 실제로는 임베딩 + FAISS 로 처리하지만, PoC 는 사전으로 충분하다.
@@ -123,6 +126,20 @@ def _stamp(payload: dict, source: str) -> dict:
     return payload
 
 
+def _add_context(result: dict, destination_name: str | None) -> None:
+    """경로·시간표 조회가 성공했고 목적지가 서울 121장소에 해당하면 혼잡도/
+    사고통제/문화행사 부가정보를 붙인다. 121장소 밖이거나 데이터가 없으면
+    아무 것도 하지 않는다 — context 키 자체를 넣지 않는다."""
+    if not destination_name:
+        return
+    area = citydata_api.resolve_area(destination_name)
+    if not area:
+        return
+    ctx = citydata_api.get_context(area)
+    if ctx:
+        result["context"] = ctx
+
+
 # ─────────────────────────────────────────────────────────
 RAIL_TABLE = {
     ("SEOUL", "BUSAN"): [("KTX 101", 158, 59800), ("KTX 105", 165, 59800), ("KTX-이음 213", 178, 47900)],
@@ -188,9 +205,10 @@ def search_rail(origin: str | None, destination: str | None,
             "fare_krw": fare * n,
             "seats_available": True,
         })
-    return _stamp({"found": True, "origin": o["name"],
-                   "destination": d["name"], "pax": n, "trains": trains},
-                  "KORAIL/SR OpenAPI (mock)")
+    result = {"found": True, "origin": o["name"],
+              "destination": d["name"], "pax": n, "trains": trains}
+    _add_context(result, d["name"])
+    return _stamp(result, "KORAIL/SR OpenAPI (mock)")
 
 
 BUS_TABLE = {
@@ -210,12 +228,13 @@ def search_bus(origin=None, destination=None, datetime_hint=None, pax=None, **_)
         return _stamp({"found": False, "reason": "no_direct_service"}, "TAGO 버스 API (mock)")
     base = _base_date(datetime_hint)
     n = pax or 1
-    return _stamp({"found": True, "origin": o["name"], "destination": d["name"],
-                   "pax": n,
-                   "buses": [{"route": r, "departure": (base + timedelta(minutes=40 * i)).strftime("%Y-%m-%d %H:%M"),
-                              "duration_min": m, "fare_krw": f * n}
-                             for i, (r, m, f) in enumerate(rows)]},
-                  "TAGO 버스 API (mock)")
+    result = {"found": True, "origin": o["name"], "destination": d["name"],
+              "pax": n,
+              "buses": [{"route": r, "departure": (base + timedelta(minutes=40 * i)).strftime("%Y-%m-%d %H:%M"),
+                         "duration_min": m, "fare_krw": f * n}
+                        for i, (r, m, f) in enumerate(rows)]}
+    _add_context(result, d["name"])
+    return _stamp(result, "TAGO 버스 API (mock)")
 
 
 FLIGHT_TABLE = {
@@ -234,12 +253,13 @@ def search_flight(origin=None, destination=None, datetime_hint=None, pax=None, *
         return _stamp({"found": False, "reason": "no_direct_service"}, "한국공항공사 API (mock)")
     base = _base_date(datetime_hint)
     n = pax or 1
-    return _stamp({"found": True, "origin": o["name"], "destination": d["name"],
-                   "pax": n,
-                   "flights": [{"flight_no": f, "departure": (base + timedelta(minutes=90 * i)).strftime("%Y-%m-%d %H:%M"),
-                                "duration_min": m, "fare_krw": p * n}
-                               for i, (f, m, p) in enumerate(rows)]},
-                  "한국공항공사 API (mock)")
+    result = {"found": True, "origin": o["name"], "destination": d["name"],
+              "pax": n,
+              "flights": [{"flight_no": f, "departure": (base + timedelta(minutes=90 * i)).strftime("%Y-%m-%d %H:%M"),
+                           "duration_min": m, "fare_krw": p * n}
+                          for i, (f, m, p) in enumerate(rows)]}
+    _add_context(result, d["name"])
+    return _stamp(result, "한국공항공사 API (mock)")
 
 
 def search_lodging(origin=None, destination=None, datetime_hint=None,
@@ -263,6 +283,17 @@ def search_lodging(origin=None, destination=None, datetime_hint=None,
 
 def search_share_mobility(origin=None, destination=None, pax=None, carried=(), **_) -> dict:
     anchor = pick_anchor(origin, destination, carried)
+
+    area = citydata_api.resolve_area(anchor) if anchor else None
+    bikes = citydata_api.get_bike(area) if area else None
+    if bikes:
+        return _stamp({"found": True, "near": area,
+                       "bike_stations": bikes,
+                       "car_share": [
+                           {"operator": "카셰어A", "spot": f"{area} 공영주차장", "distance_m": 320,
+                            "car": "경차", "price_per_10min_krw": 1200},
+                       ]}, "서울시 실시간 도시데이터(따릉이) + 제휴 API(카셰어링, mock)")
+
     o = resolve_place(anchor)
     if not o:
         return _stamp({"found": False, "reason": "unresolved_place",
@@ -282,13 +313,59 @@ def search_share_mobility(origin=None, destination=None, pax=None, carried=(), *
                    ]}, "GBFS + 제휴 API (mock)")
 
 
-def get_realtime_status(**_) -> dict:
+def get_realtime_status(origin=None, destination=None, pax=None, carried=(), **_) -> dict:
+    anchor = pick_anchor(origin, destination, carried)
+    area = citydata_api.resolve_area(anchor) if anchor else None
+    rows = citydata_api.get_subway(area) if area else None
+    if rows:
+        lines = [{"line": f"{r['station']} {r['line']}" if r.get("line") else r["station"],
+                  **({"status": r["message"]} if r.get("message") else {}),
+                  **({"direction": r["direction"]} if r.get("direction") else {})}
+                 for r in rows]
+        return _stamp({"found": True, "lines": lines}, "서울시 실시간 도시데이터 (지하철 도착정보)")
+
     return _stamp({"found": True,
                    "lines": [
                        {"line": "수도권 1호선", "status": "정상운행", "delay_min": 0},
                        {"line": "경부선 KTX", "status": "지연", "delay_min": 8,
                         "cause": "선행열차 지연"},
                    ]}, "GTFS-RT (mock)")
+
+
+def search_parking(origin=None, destination=None, pax=None, carried=(), **_) -> dict:
+    anchor = pick_anchor(origin, destination, carried)
+    area = citydata_api.resolve_area(anchor) if anchor else None
+    if not area:
+        return {"found": False, "reason": "location_not_covered", "covered_area": COVERED_AREA_LABEL}
+
+    lots = citydata_api.get_parking(area)
+    if lots:
+        return _stamp({"found": True, "near": area, "parking_lots": lots},
+                      "서울시 실시간 도시데이터 (주차장)")
+    # 키 미설정·캐시 미동기화 등으로 실시간 데이터를 못 받아도 121장소 안이면
+    # 목 데이터로 폴백한다 — API 실패가 곧 서비스 중단이 되면 안 된다.
+    return _stamp({"found": True, "near": area,
+                   "parking_lots": [
+                       {"name": f"{area} 공영주차장", "capacity": 80, "available": 23,
+                        "base_fee_krw": 1000, "base_minutes": 30, "distance_m": 200},
+                   ]}, "주차장 안내 (mock)")
+
+
+def search_ev_charger(origin=None, destination=None, pax=None, carried=(), **_) -> dict:
+    anchor = pick_anchor(origin, destination, carried)
+    area = citydata_api.resolve_area(anchor) if anchor else None
+    if not area:
+        return {"found": False, "reason": "location_not_covered", "covered_area": COVERED_AREA_LABEL}
+
+    chargers = citydata_api.get_ev_charger(area)
+    if chargers:
+        return _stamp({"found": True, "near": area, "chargers": chargers},
+                      "서울시 실시간 도시데이터 (전기차 충전소)")
+    return _stamp({"found": True, "near": area,
+                   "chargers": [
+                       {"station": f"{area} 공영충전소", "type": "DC콤보", "available_count": 2,
+                        "total_count": 4, "output_kw": 100},
+                   ]}, "전기차 충전소 안내 (mock)")
 
 
 # 접근점 타입별 대표 이동수단·소요시간·요금 (mock). 실 서비스에서는
@@ -340,6 +417,7 @@ def plan_journey(origin=None, destination=None, datetime_hint=None, pax=None, **
                          for ap in d["access_points"])
         result["destination_access_note"] = f"{d['name']} 인근 접근점: {alts}"
 
+    _add_context(result, d["name"])
     return _stamp(result, "OpenTripPlanner (mock)")
 
 
@@ -353,6 +431,8 @@ TOOL_MAP = {
     "plan_journey": plan_journey,
     "get_realtime_status": get_realtime_status,
     "fare_policy": search_rail,
+    "search_parking": search_parking,
+    "search_ev_charger": search_ev_charger,
 }
 
 

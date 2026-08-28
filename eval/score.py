@@ -44,6 +44,8 @@ Classify the user message. Respond with JSON only. No explanation, no markdown.
   coding, general trivia, or creative writing.
 - in_domain=true for questions about riding, boarding, fares, facilities, or rules
   of a transport service, even if not a schedule lookup.
+- in_domain=false for a place's crowd level or ongoing local events asked on their own
+  (지금 붐비나요, what events are happening) — not a transit-service question.
 - toxicity: 0.0 (clean) to 1.0 (severe abuse). Complaints about delays are NOT toxic.
   Detect obfuscation (separated jamo, inserted spaces, asterisk masking, romanization).
 - pii_spans: copy the exact substring found in the message.
