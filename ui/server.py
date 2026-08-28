@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -26,7 +27,8 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
-import pipeline
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "gate"))
+import pipeline  # noqa: E402
 
 app = FastAPI(title="MaaS Transit Chatbot")
 
