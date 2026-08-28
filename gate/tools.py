@@ -143,8 +143,28 @@ def _unresolved(origin, o, destination, d, source: str) -> dict:
                   source)
 
 
+def pick_anchor(origin: str | None, destination: str | None, carried=()) -> str | None:
+    """"<장소> 근처 X" 류 도구의 기준점 선택.
+
+    버그: 이전 턴에서 승계된 슬롯은 이번 턴 사용자가 실제로 말한 장소가
+    아니다. "서울역→부산역 KTX" 다음에 "광명역 근처 호텔"이라고 하면
+    게이트는 origin=광명역만 채우고 destination 은 비워서 돌려주는데,
+    비어 있던 destination 이 직전 턴의 "부산역"을 승계해버리면 광명역
+    근처를 물었는데 부산역 호텔이 나가는 사고가 난다.
+
+    원칙: 이번 턴에 사용자가 실제로 말한(승계되지 않은) 값만 기준점이
+    될 수 있다. destination 우선 → origin 순, 둘 다 승계값이면(예: "그럼
+    거기서 대중교통은?" 처럼 이번 턴에 새 장소가 아예 없는 경우) 그대로
+    destination → origin 순으로 승계값을 쓴다."""
+    fresh = [v for k, v in (("destination", destination), ("origin", origin))
+             if v and k not in carried]
+    if fresh:
+        return fresh[0]
+    return destination or origin
+
+
 def search_rail(origin: str | None, destination: str | None,
-                datetime_hint: str | None = None, pax: int | None = None) -> dict:
+                datetime_hint: str | None = None, pax: int | None = None, **_) -> dict:
     o, d = resolve_place(origin), resolve_place(destination)
     if not o or not d:
         return _unresolved(origin, o, destination, d, "KORAIL/SR OpenAPI (mock)")
@@ -181,7 +201,7 @@ BUS_TABLE = {
 }
 
 
-def search_bus(origin=None, destination=None, datetime_hint=None, pax=None) -> dict:
+def search_bus(origin=None, destination=None, datetime_hint=None, pax=None, **_) -> dict:
     o, d = resolve_place(origin), resolve_place(destination)
     if not o or not d:
         return _unresolved(origin, o, destination, d, "TAGO 버스 API (mock)")
@@ -205,7 +225,7 @@ FLIGHT_TABLE = {
 }
 
 
-def search_flight(origin=None, destination=None, datetime_hint=None, pax=None) -> dict:
+def search_flight(origin=None, destination=None, datetime_hint=None, pax=None, **_) -> dict:
     o, d = resolve_place(origin), resolve_place(destination)
     if not o or not d:
         return _unresolved(origin, o, destination, d, "한국공항공사 API (mock)")
@@ -222,8 +242,10 @@ def search_flight(origin=None, destination=None, datetime_hint=None, pax=None) -
                   "한국공항공사 API (mock)")
 
 
-def search_lodging(destination=None, datetime_hint=None, pax=None, origin=None) -> dict:
-    d = resolve_place(destination) or resolve_place(origin)
+def search_lodging(origin=None, destination=None, datetime_hint=None,
+                   pax=None, carried=()) -> dict:
+    anchor = pick_anchor(origin, destination, carried)
+    d = resolve_place(anchor)
     if not d:
         return _stamp({"found": False, "reason": "unresolved_place",
                        "unresolved": [x for x in (destination, origin) if x],
@@ -239,9 +261,9 @@ def search_lodging(destination=None, datetime_hint=None, pax=None, origin=None) 
                    ]}, "한국관광공사 TourAPI (mock)")
 
 
-def search_share_mobility(origin=None, destination=None, **_) -> dict:
-    # "강남역 근처 따릉이" 처럼 기준점이 destination 으로 들어오는 경우가 많다
-    o = resolve_place(origin) or resolve_place(destination)
+def search_share_mobility(origin=None, destination=None, pax=None, carried=(), **_) -> dict:
+    anchor = pick_anchor(origin, destination, carried)
+    o = resolve_place(anchor)
     if not o:
         return _stamp({"found": False, "reason": "unresolved_place",
                        "unresolved": [x for x in (origin, destination) if x],
@@ -276,7 +298,7 @@ _HUB_MODE = {"rail": ("RAIL", 120, 45000), "bus_terminal": ("BUS", 150, 22000),
              "unknown": ("RAIL", 120, 45000)}
 
 
-def plan_journey(origin=None, destination=None, datetime_hint=None, pax=None) -> dict:
+def plan_journey(origin=None, destination=None, datetime_hint=None, pax=None, **_) -> dict:
     o, d = resolve_place(origin), resolve_place(destination)
     if not o or not d:
         return _unresolved(origin, o, destination, d, "OpenTripPlanner (mock)")
@@ -326,8 +348,7 @@ TOOL_MAP = {
     "search_rail": search_rail,
     "search_bus": search_bus,
     "search_flight": search_flight,
-    "search_lodging": lambda origin=None, destination=None, datetime_hint=None, pax=None:
-        search_lodging(destination, datetime_hint, pax, origin),
+    "search_lodging": search_lodging,
     "share_mobility": search_share_mobility,
     "plan_journey": plan_journey,
     "get_realtime_status": get_realtime_status,
@@ -335,9 +356,13 @@ TOOL_MAP = {
 }
 
 
-def call_tool(intent: str, slots: dict) -> dict:
+def call_tool(intent: str, slots: dict, carried=()) -> dict:
+    """carried: 이번 턴 값이 아니라 직전 턴에서 승계된 슬롯 키 목록.
+    "<장소> 근처 X" 류 도구가 기준점을 고를 때(pick_anchor) 승계된 슬롯을
+    걸러내는 데 쓴다. 기본값 빈 튜플이라 이 인자를 안 넘기는 기존 호출부
+    (CLI 등)도 그대로 동작한다."""
     fn = TOOL_MAP.get(intent)
     if fn is None:
         return {"found": False, "reason": "no_tool_for_intent", "intent": intent}
     return fn(origin=slots.get("origin"), destination=slots.get("destination"),
-              datetime_hint=slots.get("datetime"), pax=slots.get("pax"))
+              datetime_hint=slots.get("datetime"), pax=slots.get("pax"), carried=carried)

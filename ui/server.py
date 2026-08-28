@@ -77,7 +77,7 @@ def chat(req: ChatIn):
     def patched_call_tool(intent, slots):
         nonlocal carried
         merged, carried = merge_slots(slots, sess["last_slots"])
-        return orig_call_tool(intent, merged)
+        return orig_call_tool(intent, merged, carried=carried)
 
     pipeline.tools.call_tool = patched_call_tool
     try:
