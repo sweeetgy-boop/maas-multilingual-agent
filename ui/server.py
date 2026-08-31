@@ -28,7 +28,9 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "gate"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pipeline  # noqa: E402
+from session_slots import merge_slots, slots_to_persist  # noqa: E402
 
 app = FastAPI(title="MaaS Transit Chatbot")
 
@@ -50,21 +52,6 @@ def get_session(sid: str | None) -> tuple[str, dict]:
         SESSIONS[sid] = {"turns": [], "last_slots": {}, "cost_usd": 0.0,
                          "tokens_in": 0, "tokens_out": 0}
     return sid, SESSIONS[sid]
-
-
-def merge_slots(new: dict, prev: dict) -> tuple[dict, list[str]]:
-    """
-    멀티턴 슬롯 승계.
-    "그럼 다음 열차는?" 처럼 슬롯이 비면 직전 턴 값을 물려받는다.
-    단 datetime 은 승계하지 않는다 — 시점이 바뀌었을 가능성이 높아 위험하다.
-    """
-    carried = []
-    merged = dict(new)
-    for k in ("origin", "destination", "pax"):
-        if not merged.get(k) and prev.get(k):
-            merged[k] = prev[k]
-            carried.append(k)
-    return merged, carried
 
 
 @app.post("/api/chat")
@@ -93,8 +80,7 @@ def chat(req: ChatIn):
 
     # 슬롯 저장 (다음 턴 승계용)
     g = r["trace"].get("gate", {})
-    slots = {"origin": g.get("origin") or None, "destination": g.get("destination") or None,
-             "pax": g.get("pax") or None}
+    slots = slots_to_persist(g)
     merged, _ = merge_slots(slots, sess["last_slots"])
     if merged.get("origin") or merged.get("destination"):
         sess["last_slots"] = merged

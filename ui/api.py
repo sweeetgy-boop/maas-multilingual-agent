@@ -39,7 +39,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "gate"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pipeline  # noqa: E402
+from session_slots import merge_slots, slots_to_persist  # noqa: E402
 
 API_KEY = os.environ.get("MAAS_API_KEY", "")
 RATE_PER_MIN = int(os.environ.get("MAAS_RATE_PER_MIN", "60"))
@@ -125,16 +127,6 @@ def classify(route: str, reason: str) -> tuple[bool, str]:
     return blocked, layer
 
 
-def merge_slots(new: dict, prev: dict) -> tuple[dict, list[str]]:
-    """멀티턴 슬롯 승계. datetime 은 시점이 바뀌었을 수 있어 승계하지 않는다."""
-    carried, merged = [], dict(new)
-    for k in ("origin", "destination", "pax"):
-        if not merged.get(k) and prev.get(k):
-            merged[k] = prev[k]
-            carried.append(k)
-    return merged, carried
-
-
 def run(text: str, session_id: str | None = None,
         origin_coords: dict | None = None, destination_coords: dict | None = None
         ) -> tuple[dict, str, list[str]]:
@@ -165,9 +157,7 @@ def run(text: str, session_id: str | None = None,
         pipeline.tools.call_tool = orig
 
     g = r["trace"].get("gate", {})
-    slots = {"origin": g.get("origin") or None,
-             "destination": g.get("destination") or None,
-             "pax": g.get("pax") or None}
+    slots = slots_to_persist(g)
     merged, _ = merge_slots(slots, sess["slots"])
     if merged.get("origin") or merged.get("destination"):
         sess["slots"] = merged
