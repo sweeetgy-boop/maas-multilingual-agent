@@ -23,6 +23,22 @@ from transit_nodes import NODE_BY_ID, find_access_points
 
 COVERED_AREA_LABEL = "서울 주요 121개 장소"
 
+# 서울 전용 실시간 데이터 도구가 121장소 밖 지명을 받았을 때 쓰는 서비스별 안내 문구.
+SERVICE_NOTE = {
+    "share_mobility": "따릉이는 서울시 공공자전거로 서울 지역에서만 운영됩니다",
+    "search_parking": "실시간 주차정보는 서울시 주요 지점에서만 제공됩니다",
+    "search_ev_charger": "실시간 충전소 정보는 서울시 주요 지점에서만 제공됩니다",
+    "get_realtime_status": "실시간 지하철 도착정보는 서울시 주요 역에서만 제공됩니다",
+}
+
+
+def _not_covered(requested: str | None, service: str) -> dict:
+    """121장소 밖 지명에 대해 목 데이터로 폴백하지 않고 커버리지 밖임을 명시한다.
+    목 데이터가 실데이터처럼 보이면 사용자가 현장에 가서 아무것도 없는 상황이 된다."""
+    return {"found": False, "reason": "location_not_covered",
+            "requested": requested, "covered_area": COVERED_AREA_LABEL,
+            "service_note": SERVICE_NOTE[service]}
+
 # ── 지명 정규화 사전 (다국어 별칭 → 표준 ID) ──
 # 실제로는 임베딩 + FAISS 로 처리하지만, PoC 는 사전으로 충분하다.
 PLACE_ALIASES = {
@@ -341,10 +357,14 @@ def search_lodging(origin=None, destination=None, datetime_hint=None,
 
 
 def search_share_mobility(origin=None, destination=None, pax=None, carried=(), **_) -> dict:
+    """따릉이는 서울시 공공자전거로 서울에서만 운영된다. 121장소 밖 지명이면
+    목 데이터로 폴백하지 않고 커버리지 밖임을 명시적으로 반환한다."""
     anchor = pick_anchor(origin, destination, carried)
-
     area = citydata_api.resolve_area(anchor) if anchor else None
-    bikes = citydata_api.get_bike(area) if area else None
+    if not area:
+        return _not_covered(anchor, "share_mobility")
+
+    bikes = citydata_api.get_bike(area)
     if bikes:
         return _stamp({"found": True, "near": area,
                        "bike_stations": bikes,
@@ -353,35 +373,45 @@ def search_share_mobility(origin=None, destination=None, pax=None, carried=(), *
                             "car": "경차", "price_per_10min_krw": 1200},
                        ]}, "서울시 실시간 도시데이터(따릉이) + 제휴 API(카셰어링, mock)")
 
-    o = resolve_place(anchor)
-    if not o:
-        return _stamp({"found": False, "reason": "unresolved_place",
-                       "unresolved": [x for x in (origin, destination) if x],
-                       "hint": "입력하신 지명을 인식하지 못했습니다. 정확한 역명, 터미널명, "
-                               "공항명 또는 시/군/구 명을 입력해 주세요."},
-                      "GBFS (mock)")
-    name = o["name"]
-    return _stamp({"found": True, "near": name,
+    # 키 미설정·캐시 미동기화 등으로 실시간 데이터를 못 받아도 121장소 안이면
+    # 목 데이터로 폴백한다 — API 실패가 곧 서비스 중단이 되면 안 된다.
+    return _stamp({"found": True, "near": area,
                    "bike_stations": [
-                       {"station": f"{name} 1번 출구", "distance_m": 80, "bikes_available": 7, "docks_free": 12},
-                       {"station": f"{name} 앞 광장", "distance_m": 150, "bikes_available": 3, "docks_free": 18},
+                       {"station": f"{area} 1번 출구", "distance_m": 80, "bikes_available": 7, "docks_free": 12},
+                       {"station": f"{area} 앞 광장", "distance_m": 150, "bikes_available": 3, "docks_free": 18},
                    ],
                    "car_share": [
-                       {"operator": "카셰어A", "spot": f"{name} 공영주차장", "distance_m": 320,
+                       {"operator": "카셰어A", "spot": f"{area} 공영주차장", "distance_m": 320,
                         "car": "경차", "price_per_10min_krw": 1200},
-                   ]}, "GBFS + 제휴 API (mock)")
+                   ]}, "GBFS (mock)")
 
 
 def get_realtime_status(origin=None, destination=None, pax=None, carried=(), **_) -> dict:
+    """지하철 도착정보는 서울시 121장소 안에서만 실시간 조회가 된다. 사용자가
+    특정 지명을 말했는데 그 지명이 121장소 밖이면(예: 대전역) 커버리지 밖임을
+    명시한다 — 관계 없는 수도권 노선 목 데이터를 그 지명의 답인 것처럼 주면
+    안 된다. 지명 없이 일반적인 지연 여부를 물었을 때만 전국 단위 목 데이터로 답한다."""
     anchor = pick_anchor(origin, destination, carried)
     area = citydata_api.resolve_area(anchor) if anchor else None
-    rows = citydata_api.get_subway(area) if area else None
-    if rows:
-        lines = [{"line": f"{r['station']} {r['line']}" if r.get("line") else r["station"],
-                  **({"status": r["message"]} if r.get("message") else {}),
-                  **({"direction": r["direction"]} if r.get("direction") else {})}
-                 for r in rows]
-        return _stamp({"found": True, "lines": lines}, "서울시 실시간 도시데이터 (지하철 도착정보)")
+
+    if area:
+        rows = citydata_api.get_subway(area)
+        if rows:
+            lines = [{"line": f"{r['station']} {r['line']}" if r.get("line") else r["station"],
+                      **({"status": r["message"]} if r.get("message") else {}),
+                      **({"direction": r["direction"]} if r.get("direction") else {})}
+                     for r in rows]
+            return _stamp({"found": True, "lines": lines}, "서울시 실시간 도시데이터 (지하철 도착정보)")
+        # 121장소 안인데 키 미설정 등으로 실시간 데이터를 못 받으면 목 데이터로 폴백한다.
+        return _stamp({"found": True,
+                       "lines": [
+                           {"line": "수도권 1호선", "status": "정상운행", "delay_min": 0},
+                           {"line": "경부선 KTX", "status": "지연", "delay_min": 8,
+                            "cause": "선행열차 지연"},
+                       ]}, "GTFS-RT (mock)")
+
+    if anchor:
+        return _not_covered(anchor, "get_realtime_status")
 
     return _stamp({"found": True,
                    "lines": [
@@ -395,7 +425,7 @@ def search_parking(origin=None, destination=None, pax=None, carried=(), **_) -> 
     anchor = pick_anchor(origin, destination, carried)
     area = citydata_api.resolve_area(anchor) if anchor else None
     if not area:
-        return {"found": False, "reason": "location_not_covered", "covered_area": COVERED_AREA_LABEL}
+        return _not_covered(anchor, "search_parking")
 
     lots = citydata_api.get_parking(area)
     if lots:
@@ -414,7 +444,7 @@ def search_ev_charger(origin=None, destination=None, pax=None, carried=(), **_) 
     anchor = pick_anchor(origin, destination, carried)
     area = citydata_api.resolve_area(anchor) if anchor else None
     if not area:
-        return {"found": False, "reason": "location_not_covered", "covered_area": COVERED_AREA_LABEL}
+        return _not_covered(anchor, "search_ev_charger")
 
     chargers = citydata_api.get_ev_charger(area)
     if chargers:

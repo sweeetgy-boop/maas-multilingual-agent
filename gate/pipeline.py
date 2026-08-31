@@ -269,7 +269,11 @@ CRITICAL RULES
    at the very end, just before the disclaimer. Mention at most one item. Never
    list multiple events. This is supplementary only — never answer a question
    that is solely about congestion, road closures, or cultural events. Those
-   are outside scope."""
+   are outside scope.
+11. If TOOL_RESULT has reason="location_not_covered", tell the user plainly
+   that the service is not available in that area, using service_note. Do not
+   invent alternative providers or locations. Never present unavailable data
+   as if it exists."""
 
 
 def call_supervisor(user_text: str, tool_result: dict, lang: str) -> str:
@@ -374,10 +378,14 @@ def handle(text: str, verbose: bool = False) -> dict:
     trace["tool"] = intent
     trace["tool_found"] = tr.get("found")
 
-    if not tr.get("found"):
+    if not tr.get("found") and tr.get("reason") != "location_not_covered":
         return {"route": "tool_empty", "reason": tr.get("reason"), "lang": lang,
                 "answer": NOT_FOUND[lang], "trace": trace,
                 "total_ms": round((time.perf_counter() - t0) * 1000)}
+
+    # location_not_covered 는 found=false 지만 Supervisor 로 넘겨 service_note 를
+    # 사용자 언어로 안내하게 한다 (SUPERVISOR_SYSTEM 규칙 11) — 여기서 일반
+    # NOT_FOUND 문구로 조기 반환하면 서비스 커버리지 안내가 나가지 않는다.
 
     # ⑤ Supervisor
     answer = call_supervisor(masked, tr, lang)
