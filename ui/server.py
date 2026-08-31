@@ -159,4 +159,4 @@ def index():
 if __name__ == "__main__":
     import uvicorn
     print("http://localhost:7860 에서 접속하세요")
-    uvicorn.run(app, host="127.0.0.1", port=7860, log_level="warning")
+    uvicorn.run(app, host="0.0.0.0", port=7860, log_level="warning")

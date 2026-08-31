@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>다국어 교통 연계 안내</title>
+<style>
+  :root {
+    --bg: #0f1216; --panel: #171b21; --line: #262c35;
+    --fg: #e6e9ee; --dim: #8b94a3; --accent: #4a9eff;
+    --ok: #3fb950; --warn: #d29922; --err: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.6 -apple-system, "Segoe UI", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    height: 100vh; display: flex; flex-direction: column;
+  }
+  header {
+    padding: 10px 16px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  .status { font-size: 11px; color: var(--dim); font-family: ui-monospace, monospace; }
+  .status b { color: var(--fg); font-weight: 500; }
+  main { flex: 1; display: flex; min-height: 0; }
+  #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #log { flex: 1; overflow-y: auto; padding: 16px; }
+  .msg { margin-bottom: 14px; max-width: 78%; }
+  .msg.user { margin-left: auto; }
+  .bubble {
+    padding: 10px 14px; border-radius: 12px; white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .user .bubble { background: var(--accent); color: #fff; border-bottom-right-radius: 3px; }
+  .bot .bubble { background: var(--panel); border: 1px solid var(--line); border-bottom-left-radius: 3px; }
+  .meta { font-size: 11px; color: var(--dim); margin-top: 4px; font-family: ui-monospace, monospace; }
+  .user .meta { text-align: right; }
+  .tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; margin-right: 5px; }
+  .t-answered { background: #16321d; color: var(--ok); }
+  .t-blocked { background: #3a2416; color: var(--warn); }
+  .t-ungrounded { background: #3d1c1c; color: var(--err); }
+  .t-booking_unsupported { background: #2a2438; color: #b083f0; }
+  .t-tool_empty { background: #2b2b2b; color: var(--dim); }
+  .t-error { background: #3d1c1c; color: var(--err); }
+
+  #presets { padding: 8px 16px; border-top: 1px solid var(--line); display: flex; gap: 6px; flex-wrap: wrap; }
+  #presets button {
+    background: var(--panel); border: 1px solid var(--line); color: var(--dim);
+    padding: 4px 9px; border-radius: 6px; font-size: 11px; cursor: pointer;
+  }
+  #presets button:hover { border-color: var(--accent); color: var(--fg); }
+
+  #inputbar { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
+  #q {
+    flex: 1; background: var(--panel); border: 1px solid var(--line); color: var(--fg);
+    padding: 10px 12px; border-radius: 8px; font: inherit; outline: none;
+  }
+  #q:focus { border-color: var(--accent); }
+  #send, #reset {
+    background: var(--accent); border: 0; color: #fff; padding: 0 18px;
+    border-radius: 8px; cursor: pointer; font: inherit;
+  }
+  #reset { background: var(--panel); border: 1px solid var(--line); color: var(--dim); padding: 0 12px; }
+  #send:disabled { opacity: .5; cursor: default; }
+
+  aside {
+    width: 340px; border-left: 1px solid var(--line); overflow-y: auto;
+    padding: 14px; background: #12161b; font-family: ui-monospace, monospace; font-size: 11.5px;
+  }
+  aside h2 { font-size: 11px; color: var(--dim); text-transform: uppercase;
+             letter-spacing: .6px; margin: 16px 0 7px; font-weight: 600; }
+  aside h2:first-child { margin-top: 0; }
+  .kv { display: flex; justify-content: space-between; padding: 2.5px 0; }
+  .kv span:first-child { color: var(--dim); }
+  pre { background: #0c0f13; border: 1px solid var(--line); border-radius: 6px;
+        padding: 9px; overflow-x: auto; margin: 0; font-size: 11px; }
+  .carry { color: var(--warn); }
+  @media (max-width: 900px) { aside { display: none; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>다국어 교통 연계 안내</h1>
+  <div class="status" id="sysinfo">확인 중…</div>
+</header>
+
+<main>
+  <div id="chat">
+    <div id="log"></div>
+    <div id="presets"></div>
+    <div id="inputbar">
+      <input id="q" placeholder="출발지와 도착지를 말씀해 주세요 (5개 언어 지원)" autocomplete="off">
+      <button id="send">전송</button>
+      <button id="reset" title="대화 초기화">초기화</button>
+    </div>
+  </div>
+
+  <aside>
+    <h2>세션</h2>
+    <div class="kv"><span>session</span><span id="m-sid">—</span></div>
+    <div class="kv"><span>turns</span><span id="m-turns">0</span></div>
+
+    <h2>지연</h2>
+    <div class="kv"><span>gate</span><span id="m-gate">—</span></div>
+    <div class="kv"><span>total</span><span id="m-total">—</span></div>
+
+    <h2>비용 (추정)</h2>
+    <div class="kv"><span>turn tokens</span><span id="m-tok">—</span></div>
+    <div class="kv"><span>session</span><span id="m-cost">—</span></div>
+
+    <h2>게이트 판정</h2>
+    <pre id="d-gate">—</pre>
+
+    <h2>도구 / 검증</h2>
+    <pre id="d-tool">—</pre>
+  </aside>
+</main>
+
+<script>
+const PRESETS = [
+  ["ko", "서울역에서 부산역 가는 KTX 오늘 오후"],
+  ["en", "Trains from Seoul Station to Busan this afternoon"],
+  ["ja", "ソウル駅から釜山駅までのKTXの時刻表"],
+  ["zh", "首尔站到釜山站的KTX今天下午班次"],
+  ["id", "Jadwal kereta dari Stasiun Seoul ke Busan sore ini"],
+  ["ko", "강남역 근처 따릉이 대여소"],
+  ["ko", "광명역 근처 호텔 오늘 밤"],
+  ["ko", "제주도 맛집 추천해줘"],
+];
+
+let sid = null;
+const $ = id => document.getElementById(id);
+
+PRESETS.forEach(([lang, text]) => {
+  const b = document.createElement("button");
+  b.textContent = `${lang} · ${text.slice(0, 22)}${text.length > 22 ? "…" : ""}`;
+  b.title = text;
+  b.onclick = () => { $("q").value = text; send(); };
+  $("presets").appendChild(b);
+});
+
+function bubble(who, text, meta) {
+  const d = document.createElement("div");
+  d.className = "msg " + who;
+  d.innerHTML = `<div class="bubble"></div><div class="meta"></div>`;
+  d.querySelector(".bubble").textContent = text;
+  if (meta) d.querySelector(".meta").innerHTML = meta;
+  $("log").appendChild(d);
+  $("log").scrollTop = $("log").scrollHeight;
+  return d;
+}
+
+async function send() {
+  const text = $("q").value.trim();
+  if (!text) return;
+  $("q").value = "";
+  $("send").disabled = true;
+  bubble("user", text);
+  const pending = bubble("bot", "…", "");
+
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({text, session_id: sid})
+    });
+    const d = await res.json();
+    sid = d.session_id;
+
+    pending.querySelector(".bubble").textContent = d.answer;
+    let meta = `<span class="tag t-${d.route}">${d.route}</span>`;
+    if (d.reason) meta += `${d.reason} · `;
+    meta += `${d.lang} · ${d.metrics.total_ms || "—"}ms`;
+    if (d.carried_slots && d.carried_slots.length)
+      meta += ` <span class="carry">↺ ${d.carried_slots.join(",")}</span>`;
+    pending.querySelector(".meta").innerHTML = meta;
+
+    const m = d.metrics;
+    $("m-sid").textContent = sid;
+    $("m-turns").textContent = m.turns ?? "—";
+    $("m-gate").textContent = m.gate_ms ? m.gate_ms + " ms" : "—";
+    $("m-total").textContent = m.total_ms ? m.total_ms + " ms" : "—";
+    $("m-tok").textContent = m.turn_tokens || 0;
+    $("m-cost").textContent = `$${m.session_cost_usd} (₩${m.session_krw})`;
+
+    const g = d.trace.gate || {};
+    $("d-gate").textContent = JSON.stringify(g, null, 1);
+    $("d-tool").textContent = JSON.stringify({
+      tool: d.trace.tool, found: d.trace.tool_found,
+      grounded: d.trace.grounded,
+      grounded_retry: d.trace.grounded_retry,
+      unsupported: d.trace.unsupported_numbers,
+      pii_masked: d.trace.pii_masked
+    }, null, 1);
+  } catch (e) {
+    pending.querySelector(".bubble").textContent = "요청 실패: " + e;
+  }
+  $("send").disabled = false;
+  $("q").focus();
+}
+
+$("send").onclick = send;
+$("q").onkeydown = e => { if (e.key === "Enter") send(); };
+$("reset").onclick = async () => {
+  await fetch("/api/reset", {method: "POST", headers: {"Content-Type": "application/json"},
+                             body: JSON.stringify({text: "", session_id: sid})});
+  sid = null; $("log").innerHTML = "";
+  $("d-gate").textContent = "—"; $("d-tool").textContent = "—";
+  ["m-sid","m-turns","m-gate","m-total","m-tok","m-cost"].forEach(i => $(i).textContent = "—");
+};
+
+fetch("/api/health").then(r => r.json()).then(d => {
+  $("sysinfo").innerHTML =
+    `gate <b>${d.gate_model}</b> · supervisor <b>${d.supervisor.split(".").pop()}</b> · guardrail <b>${d.guardrail}</b>`;
+});
+$("q").focus();
+</script>
+</body>
+</html>
