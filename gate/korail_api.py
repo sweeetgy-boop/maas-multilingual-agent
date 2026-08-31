@@ -52,6 +52,23 @@
     계획 대비 실제 차이로 지연 산출이 가능하다 — 이 모듈이 실제로
     제공하는 값은 이것 하나다.
 
+  - **구간 조회는 RunInfo2(정차역 단위)로 한다.** RunPlan2 의
+    dptre_stn_nm/arvl_stn_nm 은 열차의 시종착역이라 중간 정차역 쌍이
+    잡히지 않는다: 서울→광명·천안아산·오송, 청량리→원주가 전부 0건인데
+    실제로는 수십 편이 선다. RunInfo2 는 정차 1건 단위에 순번(trn_run_sn)
+    이 있어 두 역을 trn_no 로 조인하고 순번을 비교하면 구간이 나온다.
+      서울→광명  RunPlan2 0편 → RunInfo2 86편 (실측)
+    실측으로 확인한 조인 안전성:
+      · 한 역에서 같은 trn_no 가 두 번 나오는 경우 0건(서울 333·광명 227)
+        → trn_no 단독 키로 조인해도 안전하다.
+      · sn 비교로 판정한 방향이 uppln_dn_se_cd(D/U)와 175편 전부 일치
+        → 상하행 코드를 따로 보지 않아도 방향이 갈린다.
+      · trn_run_sn 은 **문자열**("2")로 온다. int 로 바꿔 비교해야 한다.
+      · 시발역은 trn_arvl_dt 가, 종착역은 trn_dptre_dt 가 null 이다.
+    역별 하루 정차는 40~333건이라 1페이지(1000건)로 끝난다 — 두 역이면
+    호출 2회다. 하루 전체는 9,128건이라 통째로 받는 방식(10회)도 가능하나
+    첫 조회가 3.9초로 느려 역별 2회 조회를 택했다(캐시 적중 시 0ms).
+
 용도
   1. search_schedule — **요일 매칭 참고 시간표**. target_date 와 같은
      요일의 가장 최근 보유일을 기준일로 삼아, 그 날 운행 기록의 시각을
@@ -215,10 +232,13 @@ def _has_data(ymd: str) -> bool | None:
     """그 날짜에 운행 데이터가 있는가. None = 조회 실패.
 
     과거 실적은 한 번 확정되면 바뀌지 않으므로 프로세스 수명 동안 캐시한다
-    (같은 요일 조회가 반복되면 같은 날짜를 계속 되묻게 된다)."""
+    (같은 요일 조회가 반복되면 같은 날짜를 계속 되묻게 된다).
+
+    시간표 경로가 RunInfo2 로 통일됐으므로 판정도 RunInfo2 로 한다. 두
+    오퍼레이션의 보유 날짜는 동일하다(8개 표본에서 전부 일치, 실측)."""
     if ymd in _has_data_cache:
         return _has_data_cache[ymd]
-    got = _get("travelerTrainRunPlan2", {"run_ymd::EQ": ymd}, rows=1)
+    got = _get("travelerTrainRunInfo2", {"run_ymd::EQ": ymd}, rows=1)
     if got is None:
         return None
     _has_data_cache[ymd] = got[0] > 0
@@ -327,9 +347,62 @@ def _shift(dt: str | None, delta: timedelta) -> str | None:
     return (parsed + delta).strftime("%Y-%m-%d %H:%M") if parsed else None
 
 
+def _station_stops(station: str, ymd: str) -> dict[str, dict] | None:
+    """그 날 그 역의 정차 기록을 {trn_no: 레코드} 로. None = 조회 실패.
+
+    한 역의 하루 정차는 40~333건이라(실측) 1페이지(1000건)로 충분하다.
+    같은 역을 같은 날 두 번 지나는 열차는 없어(서울 333건·광명 227건에서
+    중복 trn_no 0건, 실측) trn_no 단독 키가 안전하다."""
+    got = _get("travelerTrainRunInfo2",
+               {"run_ymd::GTE": ymd, "run_ymd::LTE": ymd,
+                "stn_nm::EQ": station}, rows=1000)
+    if got is None:
+        return None
+    return {r["trn_no"]: r for r in got[1] if r.get("trn_no")}
+
+
+def search_via_stops(origin: str, destination: str, ref_ymd: str,
+                     limit: int = 5) -> list[dict] | None:
+    """정차역 단위(RunInfo2)로 구간 시간표를 만든다. None = 조회 실패.
+
+    두 역의 정차 목록을 trn_no 로 조인하고, 출발역의 정차 순번(trn_run_sn)
+    이 도착역보다 작은 열차만 남긴다. 이 비교 하나로 방향이 갈린다 —
+    서울·광명 공통 175편을 sn 으로 나눈 결과가 uppln_dn_se_cd(상/하행)와
+    175편 전부 일치했다(실측). 그래서 상하행 코드를 따로 보지 않는다.
+
+    trn_run_sn 은 문자열("2")로 오므로 반드시 int 로 바꿔 비교한다.
+    문자열 그대로 비교하면 "10" < "2" 가 되어 순서가 뒤집힌다."""
+    o_stops = _station_stops(origin, ref_ymd)
+    if o_stops is None:
+        return None
+    d_stops = _station_stops(destination, ref_ymd)
+    if d_stops is None:
+        return None
+
+    rows = []
+    for trn_no, o in o_stops.items():
+        d = d_stops.get(trn_no)
+        if d is None:
+            continue
+        try:
+            if int(o["trn_run_sn"]) >= int(d["trn_run_sn"]):
+                continue                      # 역방향이거나 같은 역
+        except (KeyError, TypeError, ValueError):
+            continue
+        # 출발역이 그 열차의 종착이면 출발시각이, 도착역이 시발이면
+        # 도착시각이 없다. 없는 값을 추정해 채우지 않고 건너뛴다.
+        dep, arr = o.get("trn_dptre_dt"), d.get("trn_arvl_dt")
+        if not dep or not arr:
+            continue
+        rows.append({"trn_no": trn_no, "dep": dep, "arr": arr})
+
+    rows.sort(key=lambda r: r["dep"])
+    return rows
+
+
 def search_schedule(origin: str, destination: str, target_date: str | date,
                     after_hhmm: str | None = None, limit: int = 5) -> dict | None:
-    """요일 매칭 참고 시간표 (직통만).
+    """요일 매칭 참고 시간표.
 
     이 API 에는 미래 데이터가 없으므로, target_date 와 같은 요일의 가장
     최근 보유일을 찾아 그 날 운행 기록의 시각을 target_date 로 옮겨
@@ -337,14 +410,19 @@ def search_schedule(origin: str, destination: str, target_date: str | date,
     is_reference/reference_date/reference_note 가 그 사실을 나른다.
     호출부는 이 셋을 반드시 사용자에게 전달해야 한다.
 
+    구간 조회는 RunInfo2(정차역 단위)로 한다. RunPlan2 는 열차의
+    출발역→종착역 한 쌍만 기록해서 중간 정차역이 잡히지 않았다 —
+    서울→광명·천안아산·오송, 청량리→원주가 전부 0건이었다. 정차역 단위로
+    바꾸면서 서울→광명이 0편에서 86편이 됐다(실측).
+
+    시각은 전부 RunInfo2 의 **실제 운행 기록**이다. RunPlan2 의 계획
+    시각과 몇 분 차이가 나므로(00001 부산 도착: 계획 07:50 / 실제 07:54)
+    섞지 않고 한쪽으로 통일했다.
+
     운임·열차종별은 API 가 주지 않으므로 필드를 넣지 않는다(지어내지 않는다).
 
-    ⚠ 조회 단위는 열차의 **출발역→종착역** 쌍이다. 경유역은 잡히지 않아
-    서울→광명·천안아산·오송, 청량리→원주가 모두 0건이다(실측). 0건을
-    "직통 없음"과 구별할 수 없으므로 그 경우도 None 을 돌려준다.
-
-    키 없음·조회 실패·기준일 없음·구간 미조회면 None
-    (호출부가 목 데이터로 폴백)."""
+    키 없음·조회 실패·기준일 없음·구간 0건이면 None (호출부가 목 데이터로
+    폴백). 0건을 "운행 없음"으로 단정하지 않는다."""
     if not KEY:
         return None
 
@@ -355,48 +433,37 @@ def search_schedule(origin: str, destination: str, target_date: str | date,
     if ref is None:
         return None
 
-    ref_ymd = ref.strftime("%Y%m%d")
-    cond = {"run_ymd::GTE": ref_ymd, "run_ymd::LTE": ref_ymd,
-            "dptre_stn_nm::EQ": origin,
-            "arvl_stn_nm::EQ": destination}
-    got = _get("travelerTrainRunPlan2", cond, rows=200)
-    if got is None:
+    rows = search_via_stops(origin, destination, ref.strftime("%Y%m%d"), limit)
+    if rows is None:
         return None
 
     delta = target - ref
-    rows = sorted(got[1], key=lambda r: r.get("trn_plan_dptre_dt") or "")
-
     trains = []
     for r in rows:
-        dep = _shift(r.get("trn_plan_dptre_dt"), delta)
+        dep = _shift(r["dep"], delta)
         if dep is None:
             continue
         if after_hhmm and dep[11:] < after_hhmm:
             continue
         trains.append({
-            "train_no": r.get("trn_no"),
+            "train_no": r["trn_no"],
             "departure": dep,
-            "arrival": _shift(r.get("trn_plan_arvl_dt"), delta),
-            "duration_min": _minutes(r.get("trn_plan_dptre_dt"),
-                                     r.get("trn_plan_arvl_dt")),
+            # 도착에도 같은 delta 를 더한다. 자정을 넘는 열차는 도착 날짜가
+            # 출발보다 하루 뒤인데, 같은 delta 면 그 관계가 보존된다.
+            "arrival": _shift(r["arr"], delta),
+            "duration_min": _minutes(r["dep"], r["arr"]),
         })
 
-    common = {"origin": origin, "destination": destination,
-              "date": target.isoformat(),
-              "reference_date": ref.isoformat(),
-              "reference_note": _reference_note(ref),
-              "is_reference": True}
-
     if not trains:
-        # 0건을 "직통 없음"으로 읽으면 안 된다. RunPlan2 는 열차의
-        # **출발역→종착역** 한 쌍만 기록하므로, 경유역은 조회되지 않는다:
-        # 서울→광명/천안아산/오송, 청량리→원주가 전부 0건인데 실제로는
-        # 수많은 열차가 선다(실측). 이 API 로는 "운행이 없다"와 "이 쌍이
-        # 계획 데이터에 없다"를 구별할 수 없으므로, 없다고 단정하지 않고
-        # 답할 수 없음(None)으로 돌려 호출부가 목 데이터로 폴백하게 한다.
         return None
 
-    return {"found": True, **common, "trains": trains[:limit]}
+    return {"found": True, "origin": origin, "destination": destination,
+            "date": target.isoformat(),
+            "reference_date": ref.isoformat(),
+            "reference_note": _reference_note(ref),
+            "is_reference": True,
+            "lookup": "RunInfo2/stops",     # 어느 경로로 얻었는지 (디버깅용)
+            "trains": trains[:limit]}
 
 
 def delay_history(run_ymd: str | None = None, station: str | None = None,
