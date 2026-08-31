@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 
 import citydata_api
 import expbus_api
+import korail_api
 import odsay_api
 from geocode import geocode
 from transit_nodes import NODE_BY_ID, find_access_points
@@ -147,10 +148,14 @@ def _base_date(dt_hint: str | None) -> datetime:
     return now
 
 
-def _stamp(payload: dict, source: str) -> dict:
+def _stamp(payload: dict, source: str, disclaimer: str | None = None) -> dict:
+    """disclaimer 를 넘기면 기본 문구 대신 쓴다. Supervisor 규칙 6 이
+    disclaimer 를 반드시 출력하므로, 꼭 전달돼야 하는 단서(예: 실시간이
+    아니라 과거 실적 기준이라는 사실)를 여기 실으면 누락되지 않는다."""
     payload["data_source"] = source
     payload["retrieved_at"] = datetime.now().isoformat(timespec="seconds")
-    payload["disclaimer"] = "실시간 운행정보는 참고용이며, 최종 확인은 운영기관 공식 채널을 이용하세요."
+    payload["disclaimer"] = disclaimer or (
+        "실시간 운행정보는 참고용이며, 최종 확인은 운영기관 공식 채널을 이용하세요.")
     return payload
 
 
@@ -386,11 +391,65 @@ def search_share_mobility(origin=None, destination=None, pax=None, carried=(), *
                    ]}, "GBFS (mock)")
 
 
+_RAIL_MOCK_LINES = [
+    {"line": "수도권 1호선", "status": "정상운행", "delay_min": 0},
+    {"line": "경부선 KTX", "status": "지연", "delay_min": 8, "cause": "선행열차 지연"},
+]
+
+
+def _rail_station_name(place: dict | None) -> str | None:
+    """resolve_place 결과가 간선철도역이면 코레일이 쓰는 역명을 돌려준다.
+    코레일 데이터의 역명에는 '역'이 붙지 않는다(서울역 → 서울)."""
+    if not place:
+        return None
+    node = NODE_BY_ID.get(place.get("id"))
+    if not node or node.get("type") != "rail":
+        return None
+    name = (node.get("name") or "").strip()
+    return name[:-1] if name.endswith("역") else name or None
+
+
+def _rail_delay_status(station: str) -> dict | None:
+    """코레일 운행실적으로 그 역 출발 열차의 지연 현황을 만든다. 실패 시 None.
+
+    ⚠ 이 API 에는 당일·미래 데이터가 없다(korail_api 작업 0 실측). 최신
+    실적일(실측상 어제) 기준이므로 "실시간"이라고 말하면 안 된다. 기준일은
+    disclaimer 에 실어 보낸다 — Supervisor 규칙 6 이 disclaimer 를 반드시
+    출력하므로 이 단서가 누락되지 않는다.
+
+    lines 항목 스키마는 목 데이터와 동일하게 line/status/delay_min 만 쓴다.
+    지연 사유(cause)는 API 가 주지 않으므로 필드를 넣지 않는다 — 넣지
+    않으면 Supervisor 가 언급하지 않고, 지어내면 검증 계층이 차단한다."""
+    hist = korail_api.delay_history(station=station, limit=5)
+    if not hist or not hist.get("found"):
+        return None
+
+    lines = [{"line": f"{t['origin']}-{t['destination']} {t['train_no']}열차",
+              "status": "지연", "delay_min": t["delay_min"]}
+             for t in hist.get("trains", [])]
+    if not lines:
+        # 비교 대상은 있었는데 지연이 한 편도 없었던 경우.
+        lines = [{"line": f"{station} 출발 열차", "status": "정상운행", "delay_min": 0}]
+
+    ymd = hist["data_date"]
+    date_label = f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:]}"
+    return _stamp(
+        {"found": True, "lines": lines},
+        "한국철도공사 열차운행정보 (공공데이터포털)",
+        f"{date_label} 운행 실적 기준이며 실시간 정보가 아닙니다. "
+        f"당일 운행상황은 코레일 공식 채널에서 확인하세요.")
+
+
 def get_realtime_status(origin=None, destination=None, pax=None, carried=(), **_) -> dict:
-    """지하철 도착정보는 서울시 121장소 안에서만 실시간 조회가 된다. 사용자가
-    특정 지명을 말했는데 그 지명이 121장소 밖이면(예: 대전역) 커버리지 밖임을
-    명시한다 — 관계 없는 수도권 노선 목 데이터를 그 지명의 답인 것처럼 주면
-    안 된다. 지명 없이 일반적인 지연 여부를 물었을 때만 전국 단위 목 데이터로 답한다."""
+    """분기 순서
+      1. 서울시 121장소 안 → 실시간 지하철 도착정보(citydata).
+      2. 121장소 밖이지만 간선철도역 → 코레일 운행실적 기반 지연(전국 서비스).
+      3. 그 외 지명 → 커버리지 밖임을 명시한다. 관계 없는 수도권 노선 목
+         데이터를 그 지명의 답인 것처럼 주면 안 된다.
+      4. 지명 없음 → 전국 단위 목 데이터.
+
+    2번은 "실시간"이 아니다. 코레일 API 에는 당일·미래 데이터가 없어 최신
+    실적일 기준이며, 그 사실은 _rail_delay_status 가 disclaimer 에 싣는다."""
     anchor = pick_anchor(origin, destination, carried)
     area = citydata_api.resolve_area(anchor) if anchor else None
 
@@ -402,23 +461,28 @@ def get_realtime_status(origin=None, destination=None, pax=None, carried=(), **_
                       **({"direction": r["direction"]} if r.get("direction") else {})}
                      for r in rows]
             return _stamp({"found": True, "lines": lines}, "서울시 실시간 도시데이터 (지하철 도착정보)")
-        # 121장소 안인데 키 미설정 등으로 실시간 데이터를 못 받으면 목 데이터로 폴백한다.
-        return _stamp({"found": True,
-                       "lines": [
-                           {"line": "수도권 1호선", "status": "정상운행", "delay_min": 0},
-                           {"line": "경부선 KTX", "status": "지연", "delay_min": 8,
-                            "cause": "선행열차 지연"},
-                       ]}, "GTFS-RT (mock)")
+        # 121장소 안인데 키 미설정 등으로 실시간 데이터를 못 받으면 목 데이터로
+        # 폴백한다. 코레일 실적으로 대체하지 않는다 — 이 분기가 답해야 하는
+        # 것은 그 지역 지하철 도착정보이고, 간선철도 지연은 그 답이 아니다.
+        return _stamp({"found": True, "lines": [dict(x) for x in _RAIL_MOCK_LINES]},
+                      "GTFS-RT (mock)")
 
     if anchor:
+        # 서울 121장소 밖이라도 간선철도역이면 코레일 실적으로 답할 수 있다.
+        # 철도는 전국 서비스라 location_not_covered 가 맞지 않는다.
+        station = _rail_station_name(resolve_place(anchor))
+        if station:
+            rail = _rail_delay_status(station)
+            if rail:
+                return rail
         return _not_covered(anchor, "get_realtime_status")
 
-    return _stamp({"found": True,
-                   "lines": [
-                       {"line": "수도권 1호선", "status": "정상운행", "delay_min": 0},
-                       {"line": "경부선 KTX", "status": "지연", "delay_min": 8,
-                        "cause": "선행열차 지연"},
-                   ]}, "GTFS-RT (mock)")
+    # 지명 없이 일반적인 지연 여부를 물은 경우("1호선 지금 지연돼?").
+    # 여기서 코레일 간선 실적을 주면 안 된다 — 지하철 1호선을 물었는데
+    # 경부선 지연으로 답하게 된다. 전국 단위 실시간 지하철 피드가 없으므로
+    # 이 분기는 목 데이터로 남긴다.
+    return _stamp({"found": True, "lines": [dict(x) for x in _RAIL_MOCK_LINES]},
+                  "GTFS-RT (mock)")
 
 
 def search_parking(origin=None, destination=None, pax=None, carried=(), **_) -> dict:
