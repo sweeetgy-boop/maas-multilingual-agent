@@ -1,0 +1,72 @@
+version: 0.2
+
+# CodeBuild 는 검증만 하고 아티팩트를 CodeDeploy 로 넘긴다. 배포(S3 sync,
+# 서비스 재시작)는 appspec.yml 훅 스크립트가 CodeDeploy 에이전트를 통해
+# EC2 에서 직접 수행하므로, 여기서는 SSM 을 쓰지 않는다.
+#
+# 소스가 CODEPIPELINE(CodeStarSourceConnection 이 만든 zip)이라 .git 이
+# 없다 - git ls-files 대신 find 를 쓴다.
+#
+# 실제 API 호출이나 모델 추론은 하지 않는다. 이 빌드 환경에는 GPU 도
+# vLLM 도 없다.
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+
+  build:
+    commands:
+      - echo "[1/4] 문법 검사 (py_compile)"
+      - find . -name "*.py" -not -path "./.git/*" -print0 | xargs -0 -n1 python -m py_compile
+
+      - echo "[2/4] JSON 검증 (gate/*.json)"
+      - |
+        python - <<'PY'
+        import json
+        import sys
+        from pathlib import Path
+
+        files = sorted(Path("gate").glob("*.json"))
+        bad = []
+        for p in files:
+            try:
+                json.loads(p.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as e:
+                bad.append(f"{p}: {e}")
+
+        if bad:
+            print("\n".join(bad))
+            sys.exit(1)
+        print(f"{len(files)}개 JSON 파일 모두 유효: {[p.name for p in files]}")
+        PY
+
+      - echo "[3/4] 평가셋 검증 (eval/testset.jsonl)"
+      - python scripts/ci_check_testset.py eval/testset.jsonl
+
+      - echo "[4/4] 배포 구성 파일 존재 확인"
+      - test -f appspec.yml
+      - test -f scripts/deploy/application_stop.sh
+      - test -f scripts/deploy/before_install.sh
+      - test -f scripts/deploy/after_install.sh
+      - test -f scripts/deploy/application_start.sh
+      - test -f scripts/deploy/validate_service.sh
+      - echo "OK"
+
+      # CodeBuild 아티팩트(artifacts.files 의 gate/**/*, ui/**/*)에 검증
+      # 과정에서 생긴 __pycache__ 나, 저장소에는 있지만 배포 대상이 아닌
+      # *.db/*.zip 이 섞여 들어가지 않게 워크스페이스에서 미리 지운다.
+      # buildspec 의 artifacts.files 는 포함 패턴만 지원하고 제외 패턴은
+      # 없어서, 아티팩트 packaging 이 보기 전에 여기서 치운다.
+      - echo "아티팩트 제외 대상 정리 (__pycache__, *.db, *.zip)"
+      - find . -type d -name "__pycache__" -exec rm -rf {} +
+      - find . -name "*.db" -delete
+      - find gate -maxdepth 1 -name "*.zip" -delete
+
+artifacts:
+  files:
+    - appspec.yml
+    - scripts/deploy/**/*
+    - gate/**/*
+    - ui/**/*
+    - requirements.txt

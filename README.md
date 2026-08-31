@@ -91,7 +91,14 @@ python score.py --compare results/zeroshot.json results/lora-v1.json results/cpu
 **기관 정책에 맞는 블록리스트로 교체**하고, `s3://.../blocklist/{lang}.json` 에
 언어별 어휘를 채워 넣어야 한다.
 
-## 배포
+## 배포 (GitHub Actions)
+
+> **참고**: 이 저장소에는 배포 방식이 두 가지 있다 — 이 섹션(GitHub Actions +
+> SSM)과 바로 다음 섹션(CodePipeline/CodeBuild/CodeDeploy). 같은 EC2 인스턴스,
+> 같은 `maas-api` 서비스를 대상으로 하므로 **`main` 에 푸시하면 이론상 둘 다
+> 돈다.** 운영 중 하나로 정리하기 전까지는 어느 쪽이 마지막에 이겼는지
+> 헷갈릴 수 있으니 주의. (`.github/workflows/deploy.yml` 을 비활성화하려면
+> 파일을 지우거나 `on:` 트리거를 제거한다.)
 
 배포 구조: `로컬 → S3(maas-deploy-508139322599/app/) → EC2(/opt/maas) → systemd(maas-api)`.
 vLLM 은 별도 도커 컨테이너(포트 8000)로 이 배포와 무관하며, 배포 과정에서 절대
@@ -156,3 +163,61 @@ sudo systemctl edit maas-api        # 또는 유닛 파일 직접 수정
 sudo systemctl daemon-reload
 sudo systemctl restart maas-api
 ```
+
+## 배포 (CodePipeline)
+
+배포 구조: `GitHub(main) → CodePipeline → CodeBuild(검증) → CodeDeploy → EC2(/opt/maas) → systemd(maas-api)`.
+`appspec.yml`(저장소 루트)과 `scripts/deploy/*.sh` 훅, `buildspec.yml` 로 구성된다.
+vLLM 도커 컨테이너(포트 8000)는 이 배포와 무관하며, 훅 스크립트는 `docker` 명령을
+전혀 쓰지 않는다.
+
+### 자동 배포
+
+`main` 에 푸시하면 CodeStarSourceConnection 이 이를 감지해 파이프라인이 돈다.
+
+1. **Source** — GitHub 저장소(`sweeetgy-boop/maas-multilingual-agent`, `main`)를
+   가져온다.
+2. **Build** (CodeBuild 프로젝트 `maas-build`) — 문법 검사, `gate/*.json` 검증,
+   `eval/testset.jsonl` 검증, 배포 구성 파일 존재 확인만 한다. 실제 API 호출이나
+   모델 추론은 하지 않는다(GPU·vLLM 없음). 검증을 통과한 소스를 그대로
+   아티팩트로 넘긴다 — SSM 은 여기서 쓰지 않는다.
+3. **Deploy** (CodeDeploy 애플리케이션 `maas-api` / 배포그룹 `maas-api-prod`) —
+   `appspec.yml` 의 훅을 EC2 위 CodeDeploy 에이전트가 순서대로 실행한다:
+   `ApplicationStop → BeforeInstall → (파일 복사) → AfterInstall → ApplicationStart
+   → ValidateService`. `gate/`, `ui/` 아래 소스만 교체하고, systemd 유닛 파일
+   (`/etc/systemd/system/maas-api.service`, API 키가 들어있는 파일)은 절대
+   덮어쓰지 않는다.
+
+**EC2 인스턴스가 정지 중이면 배포가 실패한다.** CodeDeploy 는 배포그룹의 대상
+인스턴스를 찾지 못하면(태그 `CodeDeployTarget=maas-api` 로 매칭) 그 배포를
+실패로 표시한다 — GitHub Actions 버전과 달리 "건너뜀"으로 조용히 넘어가지
+않는다. 교육 계정 비용 절감을 위해 EC2 를 자주 꺼 두므로, **이 실패는 정상
+동작이다.** 인스턴스를 켠 뒤 CodeDeploy 콘솔에서 마지막 배포를 재시도하거나
+`main` 에 빈 커밋을 푸시해 새 배포를 트리거하면 된다.
+
+### 파이프라인 최초 생성 / 갱신
+
+```bash
+./scripts/create_pipeline.sh
+```
+
+멱등적이다 — `maas-build`/`maas-pipeline` 이 이미 있으면 update, 없으면 create.
+GitHub 연결(CodeConnections)이 처음 만들어진 뒤 **PENDING** 상태라면, 실행 전에
+[콘솔](https://console.aws.amazon.com/codesuite/settings/connections)에서 한
+번 승인해야 한다 — 이건 스크립트로 자동화할 수 없다.
+
+### 수동 배포
+
+콘솔 또는 CLI 로 기존 배포그룹에 즉시 배포를 트리거할 수 있다.
+
+```bash
+aws deploy create-deployment \
+  --application-name maas-api \
+  --deployment-group-name maas-api-prod \
+  --github-location repository=sweeetgy-boop/maas-multilingual-agent,commitId=<커밋SHA>
+```
+
+### systemd 환경변수 변경
+
+CodeDeploy 훅도 systemd 유닛 파일을 건드리지 않는다(제약사항). API 키 등은
+GitHub Actions 섹션과 동일하게 **EC2 에 직접 접속**해서 바꿔야 한다.
