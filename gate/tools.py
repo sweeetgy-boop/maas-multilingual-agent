@@ -16,6 +16,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 import citydata_api
+import expbus_api
 from geocode import geocode
 from transit_nodes import NODE_BY_ID, find_access_points
 
@@ -219,22 +220,69 @@ BUS_TABLE = {
 }
 
 
-def search_bus(origin=None, destination=None, datetime_hint=None, pax=None, **_) -> dict:
+def _bus_result_from_expbus(real: dict, pax: int | None) -> dict:
+    """expbus_api.search() 의 반환(내부 전용 필드 date 포함)을 search_bus
+    의 확정 스키마로 변환한다. seats_available 은 TAGO 응답에 없으므로
+    (작업 0 실측) 채우지 않는다 — 없는 정보는 필드를 아예 넣지 않는다."""
+    n = pax or 1
+    if not real.get("found"):
+        return {"found": False, "reason": real.get("reason", "no_direct_service"),
+                "origin": real.get("origin"), "destination": real.get("destination")}
+    buses = []
+    for b in real.get("buses", []):
+        row = {"route": b["route"], "departure": b["departure"]}
+        if "duration_min" in b:
+            row["duration_min"] = b["duration_min"]
+        row["fare_krw"] = b["fare_krw"] * n
+        if "grade" in b:
+            row["grade"] = b["grade"]
+        buses.append(row)
+    return {"found": True, "origin": real["origin"], "destination": real["destination"],
+            "pax": n, "buses": buses}
+
+
+def search_bus(origin=None, destination=None, datetime_hint=None, pax=None, carried=(), **_) -> dict:
+    """도시 간 이동(출발/도착이 서로 다른 장소로 둘 다 해소됨)이면 TAGO
+    고속버스정보를 우선 조회한다. 실패하거나(터미널 없음·API 오류) 근거리
+    질의("<장소> 근처 버스정류장" 류, 장소가 하나뿐)면 서울 121장소 안일
+    때 실시간 버스정류소 위치로 폴백하고, 그마저 없으면 목 데이터를 쓴다."""
     o, d = resolve_place(origin), resolve_place(destination)
+
+    if o and d and o["id"] != d["id"]:
+        date_str = _base_date(datetime_hint).strftime("%Y%m%d")
+        real = expbus_api.search(origin, destination, date_str)
+        if real is not None:
+            result = _bus_result_from_expbus(real, pax)
+            if result["found"]:
+                _add_context(result, d["name"])
+            return _stamp(result, "TAGO 고속버스정보 (국토교통부, 공공데이터포털)")
+
+        rows = BUS_TABLE.get((o["id"], d["id"])) or BUS_TABLE.get((d["id"], o["id"]))
+        if rows:
+            base = _base_date(datetime_hint)
+            n = pax or 1
+            result = {"found": True, "origin": o["name"], "destination": d["name"],
+                      "pax": n,
+                      "buses": [{"route": r, "departure": (base + timedelta(minutes=40 * i)).strftime("%Y-%m-%d %H:%M"),
+                                 "duration_min": m, "fare_krw": f * n}
+                                for i, (r, m, f) in enumerate(rows)]}
+            _add_context(result, d["name"])
+            return _stamp(result, "TAGO 버스 API (mock)")
+        return _stamp({"found": False, "reason": "no_direct_service",
+                       "origin": o["name"], "destination": d["name"]}, "TAGO 버스 API (mock)")
+
+    anchor = pick_anchor(origin, destination, carried)
+    area = citydata_api.resolve_area(anchor) if anchor else None
+    if area:
+        stops = citydata_api.get_bus_stops(area)
+        if stops:
+            return _stamp({"found": True, "near": area, "stops": stops},
+                          "서울시 실시간 도시데이터 (버스정류소)")
+
     if not o or not d:
         return _unresolved(origin, o, destination, d, "TAGO 버스 API (mock)")
-    rows = BUS_TABLE.get((o["id"], d["id"])) or BUS_TABLE.get((d["id"], o["id"]))
-    if not rows:
-        return _stamp({"found": False, "reason": "no_direct_service"}, "TAGO 버스 API (mock)")
-    base = _base_date(datetime_hint)
-    n = pax or 1
-    result = {"found": True, "origin": o["name"], "destination": d["name"],
-              "pax": n,
-              "buses": [{"route": r, "departure": (base + timedelta(minutes=40 * i)).strftime("%Y-%m-%d %H:%M"),
-                         "duration_min": m, "fare_krw": f * n}
-                        for i, (r, m, f) in enumerate(rows)]}
-    _add_context(result, d["name"])
-    return _stamp(result, "TAGO 버스 API (mock)")
+    return _stamp({"found": False, "reason": "no_direct_service",
+                   "origin": o["name"], "destination": d["name"]}, "TAGO 버스 API (mock)")
 
 
 FLIGHT_TABLE = {
@@ -394,6 +442,16 @@ def plan_journey(origin=None, destination=None, datetime_hint=None, pax=None, **
     n = pax or 1
     mode, mins, fare = _HUB_MODE.get(d_hub["type"], _HUB_MODE["unknown"])
 
+    used_real_bus = False
+    if d_hub["type"] == "bus_terminal":
+        real = expbus_api.search(o["name"], d_hub["name"], base.strftime("%Y%m%d"))
+        if real and real.get("found") and real.get("buses"):
+            first = real["buses"][0]
+            if "duration_min" in first:
+                mins = first["duration_min"]
+            fare = first["fare_krw"]
+            used_real_bus = True
+
     legs = [
         {"mode": "WALK", "from": o["name"], "to": f"{o_hub['name']} 승강장",
          "duration_min": 6, "fare_krw": 0},
@@ -418,7 +476,9 @@ def plan_journey(origin=None, destination=None, datetime_hint=None, pax=None, **
         result["destination_access_note"] = f"{d['name']} 인근 접근점: {alts}"
 
     _add_context(result, d["name"])
-    return _stamp(result, "OpenTripPlanner (mock)")
+    source = ("OpenTripPlanner (mock) + TAGO 고속버스정보 (국토교통부)"
+              if used_real_bus else "OpenTripPlanner (mock)")
+    return _stamp(result, source)
 
 
 # 게이트가 반환하는 intent → 도구 매핑
