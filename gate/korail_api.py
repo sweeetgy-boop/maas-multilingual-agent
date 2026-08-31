@@ -189,46 +189,65 @@ def latest_data_date(today: str | None = None) -> str | None:
     return None
 
 
-def load_stations() -> dict[str, str]:
-    """역명 → 역코드. 캐시 파일이 없으면 빈 dict."""
+def _load_cache() -> dict:
     if not STATIONS_PATH.exists():
         return {}
     try:
-        return json.loads(STATIONS_PATH.read_text(encoding="utf-8")).get("stations", {})
+        return json.loads(STATIONS_PATH.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
 
 
-def sync_stations() -> int:
-    """codes2 에서 역 코드를 받아 rail_stations.json 에 캐시한다.
+def load_stations() -> dict[str, str]:
+    """역명 → 역코드. 캐시 파일이 없으면 빈 dict."""
+    return _load_cache().get("stations", {})
 
-    codes2 는 cond 없이 호출하면 0건이므로 type::EQ=stn_cd 를 준다."""
-    if not KEY:
-        raise SystemExit("DATA_GO_KR_KEY_ENC 환경변수가 필요합니다 (.env 참조)")
 
-    stations: dict[str, str] = {}
+def load_lines() -> dict[str, str]:
+    """주운행선명 → 노선코드 (mrnt_cd). 캐시 파일이 없으면 빈 dict."""
+    return _load_cache().get("lines", {})
+
+
+def _fetch_codes(code_type: str) -> dict[str, str]:
+    """codes2 의 한 type 을 전부 받아 {코드명: 코드값} 으로 만든다.
+    codes2 는 cond 없이 호출하면 0건이므로 type::EQ 를 반드시 준다."""
+    out: dict[str, str] = {}
     page = 1
     while page <= 20:
-        got = _get("codes2", {"type::EQ": "stn_cd"}, rows=1000, page=page)
+        got = _get("codes2", {"type::EQ": code_type}, rows=1000, page=page)
         if got is None:
-            raise SystemExit("codes2 조회 실패")
+            raise SystemExit(f"codes2 조회 실패 (type={code_type})")
         total, items = got
         if not items:
             break
         for it in items:
             name, code = it.get("value"), it.get("code")
-            # '*'(기타) 같은 특수 코드는 역이 아니다.
-            if name and code and code.isdigit():
-                stations.setdefault(name, code)
+            # '*'(기타) 같은 특수 코드는 실제 역·노선이 아니다.
+            if name and code and code != "*":
+                out.setdefault(name, code)
         if page * 1000 >= total:
             break
         page += 1
+    return out
+
+
+def sync_stations() -> tuple[int, int]:
+    """codes2 에서 역 코드와 주운행선 코드를 받아 rail_stations.json 에 캐시한다.
+
+    노선까지 받는 이유: "지금 경부선 지연돼?" 처럼 역이 아니라 노선을
+    가리키는 질의를 실데이터로 답하려면 노선명 목록이 필요하다."""
+    if not KEY:
+        raise SystemExit("DATA_GO_KR_KEY_ENC 환경변수가 필요합니다 (.env 참조)")
+
+    stations = {n: c for n, c in _fetch_codes("stn_cd").items() if c.isdigit()}
+    lines = _fetch_codes("mrnt_cd")
 
     STATIONS_PATH.write_text(json.dumps(
         {"generated_at": datetime.now().isoformat(timespec="seconds"),
-         "count": len(stations), "stations": stations},
+         "count": len(stations), "line_count": len(lines),
+         "stations": stations, "lines": lines},
         ensure_ascii=False, indent=1), encoding="utf-8")
-    return len(stations)
+    return len(stations), len(lines)
 
 
 # ─────────────────────────────────────────────────────────
@@ -279,13 +298,18 @@ def search_schedule(origin: str, destination: str, run_ymd: str,
 
 
 def delay_history(run_ymd: str | None = None, station: str | None = None,
-                  limit: int = 5) -> dict | None:
+                  line: str | None = None, limit: int = 5) -> dict | None:
     """계획 대비 실제 출발시각 차이로 지연을 산출한다.
 
     RunPlan2(계획)와 RunInfo2(실제)를 열차번호로 조인한다. RunInfo2 의
     시발역(stop_se_cd=01) 레코드를 실제 출발로 본다.
 
-    station 을 주면 그 역을 시발로 하는 열차만 본다.
+    station 을 주면 그 역을 시발로 하는 열차만, line(주운행선명, 예 "경부선")
+    을 주면 그 노선 열차만 본다. 노선은 RunInfo2 에만 있는 필드라
+    RunPlan2 쪽에는 걸 수 없다 — 조인한 뒤 거른다.
+
+    지연의 중앙값은 1분이다(실측). 대부분은 사실상 정시이므로 호출부가
+    "지연 n건"을 그대로 내보내면 과장이 된다.
     반환에 data_date 를 실어 호출부가 기준일을 밝힐 수 있게 한다."""
     ymd = run_ymd or latest_data_date()
     if not ymd:
@@ -304,6 +328,8 @@ def delay_history(run_ymd: str | None = None, station: str | None = None,
     icond = {"run_ymd::EQ": ymd, "stop_se_cd::EQ": "01"}     # 시발
     if station:
         icond["stn_nm::EQ"] = station
+    if line:
+        icond["mrnt_nm::EQ"] = line
     infos = _get("travelerTrainRunInfo2", icond, rows=1000)
     if infos is None:
         return None
@@ -338,7 +364,70 @@ def delay_history(run_ymd: str | None = None, station: str | None = None,
             "delayed_count": len(delayed),
             "on_time_count": ontime,
             "trains": delayed[:limit],
-            **({"station": station} if station else {})}
+            **({"station": station} if station else {}),
+            **({"line": line} if line else {})}
+
+
+
+def get_station_history(station: str, line: str | None = None,
+                        run_ymd: str | None = None, limit: int = 10) -> dict | None:
+    """역별 운행 이력 (RunInfo2). 그 역을 지나간 열차의 실제 시각이다.
+
+    RunPlan2 와 구조가 다르다. RunPlan2 는 열차 1건 단위라 출발·도착역
+    필터로 구간 조회가 되지만, RunInfo2 는 정차역 1건 단위이고 역·노선
+    필터만 있어 구간 조회가 안 된다. 그래서 이 함수는 "이 역의 이력"만
+    답한다.
+
+    delay_min 은 그 역이 **시발역인 열차에만** 채운다. RunPlan2 가 주는
+    계획 시각은 시발 출발과 종착 도착 두 개뿐이라, 중간 정차역의 계획
+    시각은 어디에도 없어 지연을 계산할 수 없기 때문이다. 없는 값을
+    추정해 채우지 않는다.
+
+    행선지(origin/destination)는 RunInfo2 에 없어 RunPlan2 를 열차번호로
+    조인해 붙인다(실측 매칭률 100%)."""
+    ymd = run_ymd or latest_data_date()
+    if not ymd:
+        return None
+
+    icond = {"run_ymd::EQ": ymd, "stn_nm::EQ": station}
+    if line:
+        icond["mrnt_nm::EQ"] = line
+    infos = _get("travelerTrainRunInfo2", icond, rows=1000)
+    if infos is None:
+        return None
+    if not infos[1]:
+        return {"found": False, "reason": "no_data", "station": station,
+                "data_date": ymd, **({"line": line} if line else {})}
+
+    plans = _get("travelerTrainRunPlan2", {"run_ymd::EQ": ymd}, rows=1000)
+    plan_by_no = {p.get("trn_no"): p for p in (plans[1] if plans else [])}
+
+    rows = []
+    for r in sorted(infos[1], key=lambda x: x.get("trn_dptre_dt")
+                    or x.get("trn_arvl_dt") or ""):
+        plan = plan_by_no.get(r.get("trn_no"))
+        row = {"train_no": r.get("trn_no")}
+        if plan:
+            row["origin"] = plan.get("dptre_stn_nm")
+            row["destination"] = plan.get("arvl_stn_nm")
+        if r.get("trn_arvl_dt"):
+            row["arrival"] = _fmt(r["trn_arvl_dt"])
+        if r.get("trn_dptre_dt"):
+            row["departure"] = _fmt(r["trn_dptre_dt"])
+        if r.get("mrnt_nm"):
+            row["line"] = r["mrnt_nm"]
+        if r.get("stop_se_nm"):
+            row["stop_type"] = r["stop_se_nm"]
+        # 시발역일 때만 계획과 대조할 수 있다.
+        if r.get("stop_se_cd") == "01" and plan:
+            d = _delta_min(plan.get("trn_plan_dptre_dt"), r.get("trn_dptre_dt"))
+            if d is not None:
+                row["delay_min"] = d
+        rows.append(row)
+
+    return {"found": True, "station": station, "data_date": ymd,
+            "total": len(rows), "trains": rows[:limit],
+            **({"line": line} if line else {})}
 
 
 # ─────────────────────────────────────────────────────────
@@ -350,7 +439,8 @@ if __name__ == "__main__":
     ap.add_argument("--date")
     ap.add_argument("--after", help="HH:MM 이후 출발")
     ap.add_argument("--delays", action="store_true", help="지연 이력")
-    ap.add_argument("--station", help="--delays 대상 시발역")
+    ap.add_argument("--station", help="역별 운행 이력 (--delays 와 함께 쓰면 시발역 필터)")
+    ap.add_argument("--line", help="주운행선명 (예 경부선)")
     ap.add_argument("--latest", action="store_true", help="보유 최신 데이터 날짜")
     a = ap.parse_args()
 
@@ -358,12 +448,14 @@ if __name__ == "__main__":
         print(json.dumps(x, ensure_ascii=False, indent=2))
 
     if a.stations:
-        n = sync_stations()
-        print(f"역 코드 {n}개 → {STATIONS_PATH}", file=sys.stderr)
+        ns, nl = sync_stations()
+        print(f"역 코드 {ns}개 / 노선 {nl}개 → {STATIONS_PATH}", file=sys.stderr)
     elif a.latest:
         print(latest_data_date() or "(없음)")
     elif a.delays:
-        out(delay_history(a.date, a.station))
+        out(delay_history(a.date, a.station, a.line))
+    elif a.station:
+        out(get_station_history(a.station, a.line, a.date))
     elif a.origin and a.destination:
         ymd = a.date or latest_data_date()
         if not ymd:

@@ -409,8 +409,26 @@ def _rail_station_name(place: dict | None) -> str | None:
     return name[:-1] if name.endswith("역") else name or None
 
 
-def _rail_delay_status(station: str) -> dict | None:
-    """코레일 운행실적으로 그 역 출발 열차의 지연 현황을 만든다. 실패 시 None.
+def _rail_line_name(text: str | None) -> str | None:
+    """질의에 코레일 주운행선명이 들어 있으면 그 노선명을 돌려준다.
+    "경부선 KTX", "지금 경부선" 처럼 수식어가 붙어도 잡히게 부분일치로 본다.
+    긴 이름부터 보는 이유: "경부선"과 "경부선고속"이 둘 다 있으면 더 구체적인
+    쪽이 맞다."""
+    if not text:
+        return None
+    names = korail_api.load_lines()
+    if not names:
+        return None
+    for name in sorted(names, key=len, reverse=True):
+        if len(name) >= 3 and name in text:
+            return name
+    return None
+
+
+def _rail_delay_status(station: str | None = None,
+                       line: str | None = None) -> dict | None:
+    """코레일 운행실적으로 지연 현황을 만든다. 실패 시 None.
+    station 은 시발역, line 은 주운행선명으로 거른다.
 
     ⚠ 이 API 에는 당일·미래 데이터가 없다(korail_api 작업 0 실측). 최신
     실적일(실측상 어제) 기준이므로 "실시간"이라고 말하면 안 된다. 기준일은
@@ -420,7 +438,7 @@ def _rail_delay_status(station: str) -> dict | None:
     lines 항목 스키마는 목 데이터와 동일하게 line/status/delay_min 만 쓴다.
     지연 사유(cause)는 API 가 주지 않으므로 필드를 넣지 않는다 — 넣지
     않으면 Supervisor 가 언급하지 않고, 지어내면 검증 계층이 차단한다."""
-    hist = korail_api.delay_history(station=station, limit=5)
+    hist = korail_api.delay_history(station=station, line=line, limit=5)
     if not hist or not hist.get("found"):
         return None
 
@@ -429,7 +447,8 @@ def _rail_delay_status(station: str) -> dict | None:
              for t in hist.get("trains", [])]
     if not lines:
         # 비교 대상은 있었는데 지연이 한 편도 없었던 경우.
-        lines = [{"line": f"{station} 출발 열차", "status": "정상운행", "delay_min": 0}]
+        subject = line or f"{station} 출발 열차"
+        lines = [{"line": subject, "status": "정상운행", "delay_min": 0}]
 
     ymd = hist["data_date"]
     date_label = f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:]}"
@@ -471,10 +490,17 @@ def get_realtime_status(origin=None, destination=None, pax=None, carried=(), **_
         # 서울 121장소 밖이라도 간선철도역이면 코레일 실적으로 답할 수 있다.
         # 철도는 전국 서비스라 location_not_covered 가 맞지 않는다.
         station = _rail_station_name(resolve_place(anchor))
-        if station:
-            rail = _rail_delay_status(station)
+        # "경부선" 처럼 역이 아니라 노선을 가리킨 경우도 철도 질의다.
+        line = None if station else _rail_line_name(anchor)
+        if station or line:
+            rail = _rail_delay_status(station=station, line=line)
             if rail:
                 return rail
+            # 철도는 전국 서비스다. 키 미설정·조회 실패로 실데이터를 못 받아도
+            # 커버리지 밖이 아니므로 목 데이터로 폴백한다(서울 전용 도구들과
+            # 다른 점이다).
+            return _stamp({"found": True, "lines": [dict(x) for x in _RAIL_MOCK_LINES]},
+                          "GTFS-RT (mock)")
         return _not_covered(anchor, "get_realtime_status")
 
     # 지명 없이 일반적인 지연 여부를 물은 경우("1호선 지금 지연돼?").
