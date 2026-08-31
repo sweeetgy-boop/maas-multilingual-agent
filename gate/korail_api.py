@@ -32,8 +32,13 @@
     두 오퍼레이션의 범위가 같고, 7일 간격 14개 표본에 결측일이 없다 —
     산발적 과거 날짜가 아니라 약 3개월 롤링 윈도우로 연속 적재된다.
     즉 이 API 는 시간표가 아니라 **과거 실적 데이터**다.
-    따라서 search_rail(시간표 조회)에는 쓸 수 없고, 쓰면 안 된다.
-    과거 운행을 미래 시간표처럼 제시하는 것이기 때문이다.
+    미래 시간표로 그대로 제시하면 안 된다.
+  - **열차 다이어는 요일 단위로 반복된다(실측).** 서울→부산 직통 편수는
+    월 08-24/08-17/08-10/08-03 이 60/62/63/63 편으로 안정적인 반면,
+    토 08-29 는 72편, 일 08-30 은 71편이다. 평일과 주말 다이어가 실제로
+    다르므로 "가장 최근 날짜"가 아니라 **같은 요일의 최근 날짜**를 써야
+    한다. 5개 구간(서울-부산/대전/동대구, 용산-목포, 청량리-안동) 모두
+    4주 전까지 같은 요일 데이터가 빠짐없이 있었다.
   - **열차종별(KTX/무궁화) 코드가 없다.** codes2 의 type 을 전수
     조사한 결과 13종뿐이고 종별 코드는 없다:
       stn_cd, sbwy_stn_cd, stor_stn_cd, mrnt_cd, sbwy_ln_cd,
@@ -47,10 +52,18 @@
     계획 대비 실제 차이로 지연 산출이 가능하다 — 이 모듈이 실제로
     제공하는 값은 이것 하나다.
 
-용도 (사용자 확인 완료: 판단 분기 ii)
-  시간표 조회에는 쓰지 않는다. get_realtime_status 의 철도 지연 이력
-  용도로만 제한 사용한다. 응답에는 반드시 기준일(data_date)을 실어
-  호출부가 "실시간"이 아니라 "최신 실적일 기준"임을 밝힐 수 있게 한다.
+용도
+  1. search_schedule — **요일 매칭 참고 시간표**. target_date 와 같은
+     요일의 가장 최근 보유일을 기준일로 삼아, 그 날 운행 기록의 시각을
+     target_date 로 옮겨 보여준다. 지어낸 목 데이터("KTX 101, 13:00,
+     59,800원" — 존재하지 않는 편명)보다 실제 운행 기록이 낫다는 판단이다.
+     반환에는 reference_date/reference_note/is_reference 를 반드시 실어
+     호출부와 Supervisor 가 "확정 시간표가 아니라 과거 운행 기록"임을
+     밝히게 한다. 확정 시간표로 제시하면 안 된다.
+  2. delay_history / get_station_history — 지연 이력. 최신 실적일 기준.
+
+  요금과 열차종별(KTX/무궁화)은 API 가 주지 않는다. 두 필드 모두 채우지
+  않는다 — 지어내면 근거성 검증 계층이 차단한다.
 
 인증키는 unquote 해서 쓴다 (expbus_api.py 와 동일 이유). 포털이 주는
 키는 Encoding 형태(%2F 등)라 httpx params 가 다시 인코딩하면 이중
@@ -61,7 +74,7 @@
 
 사용법
   python korail_api.py --stations                       역 코드 캐시 생성
-  python korail_api.py --from 서울 --to 부산 --date 20260830
+  python korail_api.py --from 서울 --to 부산 --date 20260901
   python korail_api.py --delays                         최신 실적일 지연 이력
   python korail_api.py --delays --station 서울
 """
@@ -73,7 +86,7 @@ import json
 import os
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -84,12 +97,18 @@ KEY = unquote(os.environ.get("DATA_GO_KR_KEY_ENC", ""))
 
 STATIONS_PATH = Path(__file__).with_name("rail_stations.json")
 
-CACHE_TTL_SEC = 600          # 시간표·실적은 자주 바뀌지 않는다
+CACHE_TTL_SEC = 3600         # 과거 실적은 갱신되지 않는다. 1시간이면 충분하다
 _cache: dict[str, tuple[float, object]] = {}
 
 # 이 API 가 보유한 최신 데이터를 찾을 때 오늘부터 거슬러 올라가는 최대 일수.
 # 실측상 최신일은 어제였지만, 적재가 며칠 밀릴 수 있으므로 여유를 둔다.
 MAX_LOOKBACK_DAYS = 14
+
+# 요일 매칭에서 거슬러 올라가는 최대 주 수. 보유 범위가 약 3개월(92일)
+# 이므로 4주는 항상 범위 안이다.
+MAX_REFERENCE_WEEKS = 4
+
+_WEEKDAY_KO = "월화수목금토일"
 
 
 # ─────────────────────────────────────────────────────────
@@ -189,6 +208,54 @@ def latest_data_date(today: str | None = None) -> str | None:
     return None
 
 
+_has_data_cache: dict[str, bool] = {}
+
+
+def _has_data(ymd: str) -> bool | None:
+    """그 날짜에 운행 데이터가 있는가. None = 조회 실패.
+
+    과거 실적은 한 번 확정되면 바뀌지 않으므로 프로세스 수명 동안 캐시한다
+    (같은 요일 조회가 반복되면 같은 날짜를 계속 되묻게 된다)."""
+    if ymd in _has_data_cache:
+        return _has_data_cache[ymd]
+    got = _get("travelerTrainRunPlan2", {"run_ymd::EQ": ymd}, rows=1)
+    if got is None:
+        return None
+    _has_data_cache[ymd] = got[0] > 0
+    return _has_data_cache[ymd]
+
+
+def find_reference_date(target_date: date) -> date | None:
+    """target_date 와 같은 요일의 가장 최근 데이터 보유일.
+
+    열차 다이어는 요일 단위로 반복되므로(평일/주말이 다르다), "가장 최근
+    날짜"가 아니라 같은 요일을 찾아야 한다. 7일 전 → 14 → 21 → 28일 전
+    순으로 시도하고 4주 안에 없으면 None.
+
+    기준은 오늘이 아니라 **target_date** 다. 사용자가 "내일"을 물으면
+    내일과 같은 요일을 찾아야 한다.
+
+    target_date 자체에 데이터가 있으면(과거 날짜를 물은 경우) 그 날을
+    그대로 쓴다 — 같은 요일의 다른 날로 대체할 이유가 없다. 오늘·미래는
+    항상 데이터가 없으므로 이 검사는 건너뛴다(불필요한 호출 방지)."""
+    if target_date < date.today():
+        if _has_data(target_date.strftime("%Y%m%d")):
+            return target_date
+
+    for weeks in range(1, MAX_REFERENCE_WEEKS + 1):
+        cand = target_date - timedelta(days=7 * weeks)
+        has = _has_data(cand.strftime("%Y%m%d"))
+        if has is None:
+            return None
+        if has:
+            return cand
+    return None
+
+
+def _reference_note(ref: date) -> str:
+    return f"{ref.isoformat()}({_WEEKDAY_KO[ref.weekday()]}) 운행 기록 기준"
+
+
 def _load_cache() -> dict:
     if not STATIONS_PATH.exists():
         return {}
@@ -251,50 +318,85 @@ def sync_stations() -> tuple[int, int]:
 
 
 # ─────────────────────────────────────────────────────────
-def search_schedule(origin: str, destination: str, run_ymd: str,
+def _shift(dt: str | None, delta: timedelta) -> str | None:
+    """'2026-08-24 05:13:00.0' 을 delta 만큼 옮겨 '2026-08-31 05:13' 로.
+
+    도착 시각도 같은 delta 로 옮긴다. 자정을 넘는 열차는 도착 날짜가
+    출발보다 하루 뒤인데, 같은 delta 를 더하면 그 관계가 그대로 보존된다."""
+    parsed = _parse(dt)
+    return (parsed + delta).strftime("%Y-%m-%d %H:%M") if parsed else None
+
+
+def search_schedule(origin: str, destination: str, target_date: str | date,
                     after_hhmm: str | None = None, limit: int = 5) -> dict | None:
-    """구간 운행실적 조회 (직통만).
+    """요일 매칭 참고 시간표 (직통만).
 
-    ⚠ 이 API 에는 미래 데이터가 없다. 반환값은 시간표가 아니라 run_ymd
-    당일의 실적이다. 시간표 안내(search_rail)에 쓰면 안 된다 — 이 함수는
-    지연 이력 계산과 CLI 검증용이다.
+    이 API 에는 미래 데이터가 없으므로, target_date 와 같은 요일의 가장
+    최근 보유일을 찾아 그 날 운행 기록의 시각을 target_date 로 옮겨
+    돌려준다. 반환값은 **확정 시간표가 아니라 과거 운행 기록**이며,
+    is_reference/reference_date/reference_note 가 그 사실을 나른다.
+    호출부는 이 셋을 반드시 사용자에게 전달해야 한다.
 
-    운임·열차종별은 API 가 주지 않으므로 필드를 넣지 않는다."""
-    cond = {"run_ymd::EQ": run_ymd,
+    운임·열차종별은 API 가 주지 않으므로 필드를 넣지 않는다(지어내지 않는다).
+
+    ⚠ 조회 단위는 열차의 **출발역→종착역** 쌍이다. 경유역은 잡히지 않아
+    서울→광명·천안아산·오송, 청량리→원주가 모두 0건이다(실측). 0건을
+    "직통 없음"과 구별할 수 없으므로 그 경우도 None 을 돌려준다.
+
+    키 없음·조회 실패·기준일 없음·구간 미조회면 None
+    (호출부가 목 데이터로 폴백)."""
+    if not KEY:
+        return None
+
+    target = (datetime.strptime(target_date, "%Y%m%d").date()
+              if isinstance(target_date, str) else target_date)
+
+    ref = find_reference_date(target)
+    if ref is None:
+        return None
+
+    ref_ymd = ref.strftime("%Y%m%d")
+    cond = {"run_ymd::GTE": ref_ymd, "run_ymd::LTE": ref_ymd,
             "dptre_stn_nm::EQ": origin,
             "arvl_stn_nm::EQ": destination}
     got = _get("travelerTrainRunPlan2", cond, rows=200)
     if got is None:
         return None
 
-    _, items = got
-    rows = sorted(items, key=lambda r: r.get("trn_plan_dptre_dt") or "")
-    if after_hhmm:
-        rows = [r for r in rows
-                if (_fmt(r.get("trn_plan_dptre_dt")) or "")[11:] >= after_hhmm]
+    delta = target - ref
+    rows = sorted(got[1], key=lambda r: r.get("trn_plan_dptre_dt") or "")
 
-    if not rows:
-        # 그 날짜에 데이터 자체가 없는 것과 그 구간에 직통이 없는 것은 다르다.
-        # 미래 날짜는 항상 전자다(이 API 에 미래 데이터가 없다) — 구별하지
-        # 않으면 "그 날 운행 없음"으로 잘못 읽힌다.
-        day = _get("travelerTrainRunPlan2", {"run_ymd::EQ": run_ymd}, rows=1)
-        if day is not None and day[0] == 0:
-            return {"found": False, "reason": "date_not_available",
-                    "origin": origin, "destination": destination, "date": run_ymd,
-                    "available_until": latest_data_date(),
-                    "note": "이 API 는 과거 운행실적만 제공하며 미래 시간표가 없습니다"}
-        return {"found": False, "reason": "no_direct_service",
-                "origin": origin, "destination": destination, "date": run_ymd}
+    trains = []
+    for r in rows:
+        dep = _shift(r.get("trn_plan_dptre_dt"), delta)
+        if dep is None:
+            continue
+        if after_hhmm and dep[11:] < after_hhmm:
+            continue
+        trains.append({
+            "train_no": r.get("trn_no"),
+            "departure": dep,
+            "arrival": _shift(r.get("trn_plan_arvl_dt"), delta),
+            "duration_min": _minutes(r.get("trn_plan_dptre_dt"),
+                                     r.get("trn_plan_arvl_dt")),
+        })
 
-    trains = [{
-        "train_no": r.get("trn_no"),
-        "departure": _fmt(r.get("trn_plan_dptre_dt")),
-        "arrival": _fmt(r.get("trn_plan_arvl_dt")),
-        "duration_min": _minutes(r.get("trn_plan_dptre_dt"), r.get("trn_plan_arvl_dt")),
-    } for r in rows[:limit]]
+    common = {"origin": origin, "destination": destination,
+              "date": target.isoformat(),
+              "reference_date": ref.isoformat(),
+              "reference_note": _reference_note(ref),
+              "is_reference": True}
 
-    return {"found": True, "origin": origin, "destination": destination,
-            "date": run_ymd, "trains": trains}
+    if not trains:
+        # 0건을 "직통 없음"으로 읽으면 안 된다. RunPlan2 는 열차의
+        # **출발역→종착역** 한 쌍만 기록하므로, 경유역은 조회되지 않는다:
+        # 서울→광명/천안아산/오송, 청량리→원주가 전부 0건인데 실제로는
+        # 수많은 열차가 선다(실측). 이 API 로는 "운행이 없다"와 "이 쌍이
+        # 계획 데이터에 없다"를 구별할 수 없으므로, 없다고 단정하지 않고
+        # 답할 수 없음(None)으로 돌려 호출부가 목 데이터로 폴백하게 한다.
+        return None
+
+    return {"found": True, **common, "trains": trains[:limit]}
 
 
 def delay_history(run_ymd: str | None = None, station: str | None = None,
@@ -457,9 +559,9 @@ if __name__ == "__main__":
     elif a.station:
         out(get_station_history(a.station, a.line, a.date))
     elif a.origin and a.destination:
-        ymd = a.date or latest_data_date()
-        if not ymd:
-            raise SystemExit("보유 데이터 날짜를 찾지 못했습니다")
+        # --date 는 조회할 날짜(오늘·내일 등)다. 어느 날 기록을 기준으로
+        # 삼을지는 find_reference_date 가 요일을 맞춰 고른다.
+        ymd = a.date or datetime.now().strftime("%Y%m%d")
         out(search_schedule(a.origin, a.destination, ymd, a.after))
     else:
         ap.print_help()

@@ -213,11 +213,49 @@ def pick_anchor(origin: str | None, destination: str | None, carried=()) -> str 
     return destination or origin
 
 
+_FARE_NOTE = "요금은 코레일 공식 홈페이지에서 확인해 주세요"
+
+
+def _rail_result_from_api(real: dict, o: dict, d: dict, pax: int | None) -> dict:
+    """korail_api.search_schedule() 반환을 search_rail 스키마로 옮긴다.
+
+    fare_krw 와 열차종별은 넣지 않는다 — API 가 주지 않으므로 채우면
+    지어내는 것이 되고, 근거성 검증 계층이 차단한다(제약 6). 대신
+    fare_note 로 어디서 확인할지 안내한다.
+
+    is_reference/reference_date/reference_note 를 그대로 실어 보낸다.
+    Supervisor 규칙이 이 셋을 보고 "확정 시간표가 아니다"를 밝힌다."""
+    return {"found": True, "origin": o["name"], "destination": d["name"],
+            "pax": pax or 1,
+            "trains": [{"train_no": t["train_no"], "departure": t["departure"],
+                        "arrival": t["arrival"], "duration_min": t["duration_min"]}
+                       for t in real["trains"]],
+            "reference_date": real["reference_date"],
+            "reference_note": real["reference_note"],
+            "is_reference": True,
+            "fare_note": _FARE_NOTE}
+
+
 def search_rail(origin: str | None, destination: str | None,
                 datetime_hint: str | None = None, pax: int | None = None, **_) -> dict:
     o, d = resolve_place(origin), resolve_place(destination)
     if not o or not d:
         return _unresolved(origin, o, destination, d, "KORAIL/SR OpenAPI (mock)")
+
+    # 코레일 실데이터를 먼저 시도한다. 목 데이터의 "KTX 101 / 59,800원"은
+    # 존재하지 않는 편명이라, 실제 운행 기록이 참고값으로도 더 낫다.
+    o_stn, d_stn = _rail_station_name(o), _rail_station_name(d)
+    if o_stn and d_stn:
+        real = korail_api.search_schedule(o_stn, d_stn,
+                                          _base_date(datetime_hint).strftime("%Y%m%d"))
+        if real and real.get("found") and real.get("trains"):
+            result = _rail_result_from_api(real, o, d, pax)
+            _add_context(result, d["name"])
+            return _stamp(
+                result, "한국철도공사 열차운행정보 (공공데이터포털)",
+                f"{real['reference_note']}입니다. 과거 운행 기록이므로 오늘 운행을 "
+                f"보장하지 않습니다. 정확한 시간표와 요금은 코레일 공식 홈페이지에서 "
+                f"확인해 주세요.")
 
     rows = RAIL_TABLE.get((o["id"], d["id"])) or RAIL_TABLE.get((d["id"], o["id"]))
     if not rows:

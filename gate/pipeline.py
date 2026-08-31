@@ -273,7 +273,13 @@ CRITICAL RULES
 11. If TOOL_RESULT has reason="location_not_covered", tell the user plainly
    that the service is not available in that area, using service_note. Do not
    invent alternative providers or locations. Never present unavailable data
-   as if it exists."""
+   as if it exists.
+12. If TOOL_RESULT has is_reference=true, you MUST state the reference_note and
+   warn that it does not guarantee today's service. Say the times come from a
+   past operating record, not a live timetable. Tell the user to confirm on the
+   operator's official channel. Never present reference data as a confirmed
+   schedule. If TOOL_RESULT has fare_note but no fare, never state a fare —
+   relay fare_note instead."""
 
 
 def call_supervisor(user_text: str, tool_result: dict, lang: str) -> str:
