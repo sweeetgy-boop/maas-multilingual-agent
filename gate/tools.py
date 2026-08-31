@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 
 import citydata_api
 import expbus_api
+import odsay_api
 from geocode import geocode
 from transit_nodes import NODE_BY_ID, find_access_points
 
@@ -65,7 +66,8 @@ def _place_from_id(pid: str, fallback_name: str) -> dict:
     node = NODE_BY_ID.get(pid)
     if node is not None:
         return {"id": pid, "name": node["name"], "lat": node["lat"], "lon": node["lon"],
-                "access_points": [{"name": node["name"], "type": node["type"], "distance_m": 0}]}
+                "access_points": [{"name": node["name"], "type": node["type"], "distance_m": 0,
+                                   "lat": node["lat"], "lon": node["lon"]}]}
     return {"id": pid, "name": fallback_name, "lat": None, "lon": None,
             "access_points": [{"name": fallback_name, "type": "unknown", "distance_m": 0}]}
 
@@ -95,7 +97,8 @@ def resolve_place(text: str | None) -> dict | None:
     if g is not None:
         if g["source"] == "transit_node":
             return {"id": g["id"], "name": g["name"], "lat": g["lat"], "lon": g["lon"],
-                    "access_points": [{"name": g["name"], "type": g["type"], "distance_m": 0}]}
+                    "access_points": [{"name": g["name"], "type": g["type"], "distance_m": 0,
+                                       "lat": g["lat"], "lon": g["lon"]}]}
         return {"id": g["id"], "name": g["name"], "lat": g["lat"], "lon": g["lon"],
                 "access_points": find_access_points(g["lat"], g["lon"])}
 
@@ -104,6 +107,14 @@ def resolve_place(text: str | None) -> dict | None:
             return _place_from_id(pid, PLACE_NAMES.get(pid, text.strip()))
 
     return None
+
+
+def resolve_place_coords(lat: float, lon: float, name: str | None = None) -> dict:
+    """좌표를 직접 받아 지오코딩을 건너뛰고 접근점만 채운다 (resolve_place 와
+    같은 반환 모양). ui/api.py 가 origin_coords/destination_coords 를 받았을
+    때 쓴다 — "내 위치" 처럼 텍스트 지명이 없는 경우."""
+    return {"id": f"COORD-{lat:.5f},{lon:.5f}", "name": name or "현재 위치",
+            "lat": lat, "lon": lon, "access_points": find_access_points(lat, lon)}
 
 
 def _base_date(dt_hint: str | None) -> datetime:
@@ -311,7 +322,7 @@ def search_flight(origin=None, destination=None, datetime_hint=None, pax=None, *
 
 
 def search_lodging(origin=None, destination=None, datetime_hint=None,
-                   pax=None, carried=()) -> dict:
+                   pax=None, carried=(), **_) -> dict:
     anchor = pick_anchor(origin, destination, carried)
     d = resolve_place(anchor)
     if not d:
@@ -423,8 +434,49 @@ _HUB_MODE = {"rail": ("RAIL", 120, 45000), "bus_terminal": ("BUS", 150, 22000),
              "unknown": ("RAIL", 120, 45000)}
 
 
-def plan_journey(origin=None, destination=None, datetime_hint=None, pax=None, **_) -> dict:
-    o, d = resolve_place(origin), resolve_place(destination)
+def _local_note(from_name: str, to_name: str) -> dict:
+    return {"mode": "LOCAL", "from": from_name, "to": to_name,
+            "note": f"{from_name}에서 {to_name}까지는 시내 대중교통 또는 택시 이용"}
+
+
+def _connector_leg(from_name: str, from_lat, from_lon, to_name: str, to_lat, to_lon,
+                    same_point: bool) -> dict:
+    """출발지<->출발 접근점, 또는 도착 접근점<->목적지 구간을 ODsay 로 계산한다.
+
+    same_point 면(접근점 자체가 곧 그 지점) 구간이 없는 것이므로 빈 legs.
+    좌표가 없거나(레거시 허브 등) ODsay 가 실패하면(키 없음/호출 오류/좌표
+    범위 밖) 기존 안내 문구로 폴백한다 — 이 폴백이 파이프라인이 죽지 않게
+    하는 최소한의 안전망이다.
+
+    반환: {"legs": [...], "total_min": int|None, "total_fare_krw": int|None,
+           "used_real": bool}. same_point 면 구간 자체가 없으므로 0(값을
+    "모르는" None 이 아니라 "쓸 것이 없어 0"이다). 반대로 ODsay 가 필요한데
+    실패했으면 None — 호출부가 이를 0으로 채우면 안 된다(모르는 값과 무료를
+    혼동하게 된다)."""
+    if same_point:
+        return {"legs": [], "total_min": 0, "total_fare_krw": 0, "used_real": False}
+
+    if None in (from_lat, from_lon, to_lat, to_lon):
+        return {"legs": [_local_note(from_name, to_name)],
+                "total_min": None, "total_fare_krw": None, "used_real": False}
+
+    route = odsay_api.search_route(from_lon, from_lat, to_lon, to_lat,
+                                    origin_name=from_name, destination_name=to_name)
+    if route is None:
+        return {"legs": [_local_note(from_name, to_name)],
+                "total_min": None, "total_fare_krw": None, "used_real": False}
+
+    return {"legs": route["legs"], "total_min": route.get("total_min"),
+            "total_fare_krw": route.get("total_fare_krw"), "used_real": True}
+
+
+def plan_journey(origin=None, destination=None, datetime_hint=None, pax=None,
+                 origin_coords: dict | None = None, destination_coords: dict | None = None,
+                 **_) -> dict:
+    o = (resolve_place_coords(origin_coords["lat"], origin_coords["lon"], origin)
+         if origin_coords else resolve_place(origin))
+    d = (resolve_place_coords(destination_coords["lat"], destination_coords["lon"], destination)
+         if destination_coords else resolve_place(destination))
     if not o or not d:
         return _unresolved(origin, o, destination, d, "OpenTripPlanner (mock)")
 
@@ -440,6 +492,29 @@ def plan_journey(origin=None, destination=None, datetime_hint=None, pax=None, **
     o_hub, d_hub = o["access_points"][0], d["access_points"][0]
     base = _base_date(datetime_hint)
     n = pax or 1
+
+    # 출발/도착이 둘 다 지하철역 자체로 곧바로 해소되면(같은 도시 내 단거리)
+    # 허브 경유 모델 대신 ODsay 로 출발지<->목적지를 한 번에 계산한다.
+    # _HUB_MODE["subway"] 는 임의 지하철역 쌍에 고정 25분/1500원을 매기는
+    # 조악한 근사치라, 실제 경로가 있는데 지어낸 값을 낼 이유가 없다.
+    if (o_hub["type"] == "subway" and o_hub["distance_m"] == 0
+            and d_hub["type"] == "subway" and d_hub["distance_m"] == 0
+            and o["lat"] is not None and d["lat"] is not None):
+        route = odsay_api.search_route(o["lon"], o["lat"], d["lon"], d["lat"],
+                                        origin_name=o["name"], destination_name=d["name"])
+        if route is not None:
+            itinerary = {"transfers": route["transfers"], "legs": route["legs"]}
+            if route.get("total_min") is not None:
+                itinerary["total_min"] = route["total_min"]
+            if route.get("total_fare_krw") is not None:
+                itinerary["total_fare_krw"] = route["total_fare_krw"]
+            result = {"found": True, "origin": o["name"], "destination": d["name"], "pax": n,
+                      "itineraries": [itinerary]}
+            _add_context(result, d["name"])
+            return _stamp(result, "ODsay LAB 대중교통 경로탐색")
+        # ODsay 실패 시 아래 허브 경유 모델로 폴백한다 (같은 지점이라 첫/
+        # 마지막 구간은 생략되고, 중간 구간이 _HUB_MODE 목값으로 채워진다)
+
     mode, mins, fare = _HUB_MODE.get(d_hub["type"], _HUB_MODE["unknown"])
 
     used_real_bus = False
@@ -452,23 +527,33 @@ def plan_journey(origin=None, destination=None, datetime_hint=None, pax=None, **
             fare = first["fare_krw"]
             used_real_bus = True
 
-    legs = [
-        {"mode": "WALK", "from": o["name"], "to": f"{o_hub['name']} 승강장",
-         "duration_min": 6, "fare_krw": 0},
-        {"mode": mode, "from": o_hub["name"], "to": d_hub["name"],
-         "duration_min": mins, "fare_krw": fare * n,
-         "departure": base.strftime("%Y-%m-%d %H:%M")},
-    ]
-    total_min, total_fare = 6 + mins, fare * n
+    # ① 출발지 -> 출발 접근점. ③ 도착 접근점 -> 목적지. 같은 지점이면 생략,
+    # 아니면 ODsay 로 계산하고 실패 시 안내 문구로 폴백한다.
+    first_leg = _connector_leg(o["name"], o.get("lat"), o.get("lon"),
+                               o_hub["name"], o_hub.get("lat"), o_hub.get("lon"),
+                               same_point=(o_hub["distance_m"] == 0))
+    last_leg = _connector_leg(d_hub["name"], d_hub.get("lat"), d_hub.get("lon"),
+                              d["name"], d.get("lat"), d.get("lon"),
+                              same_point=(d_hub["distance_m"] == 0))
 
-    # 목적지 자체가 접근점이 아니라 일반 지역이면(distance_m > 0) 마지막 구간을 명시한다
-    if d_hub["distance_m"] > 0:
-        legs.append({"mode": "LOCAL", "from": d_hub["name"], "to": f"{d['name']} 시내",
-                     "note": f"{d_hub['name']}에서 목적지까지는 시내 대중교통 또는 택시 이용"})
+    mid_leg = {"mode": mode, "from": o_hub["name"], "to": d_hub["name"],
+               "duration_min": mins, "fare_krw": fare * n,
+               "departure": base.strftime("%Y-%m-%d %H:%M")}
+    legs = [*first_leg["legs"], mid_leg, *last_leg["legs"]]
+
+    # 세 구간 합계는 값이 없는 구간(ODsay 실패로 안내 문구만 있는 경우)이
+    # 있으면 아예 넣지 않는다 - 없는 값을 0으로 채우면 안 된다.
+    min_parts = [first_leg["total_min"], mins, last_leg["total_min"]]
+    fare_parts = [first_leg["total_fare_krw"], fare * n, last_leg["total_fare_krw"]]
+
+    itinerary = {"transfers": len(legs) - 1, "legs": legs}
+    if all(v is not None for v in min_parts):
+        itinerary["total_min"] = sum(min_parts)
+    if all(v is not None for v in fare_parts):
+        itinerary["total_fare_krw"] = sum(fare_parts)
 
     result = {"found": True, "origin": o["name"], "destination": d["name"], "pax": n,
-              "itineraries": [{"total_min": total_min, "total_fare_krw": total_fare,
-                               "transfers": len(legs) - 1, "legs": legs}]}
+              "itineraries": [itinerary]}
 
     if len(d["access_points"]) > 1:
         alts = ", ".join(f"{ap['name']}({round(ap['distance_m'] / 1000, 1)}km)"
@@ -476,9 +561,12 @@ def plan_journey(origin=None, destination=None, datetime_hint=None, pax=None, **
         result["destination_access_note"] = f"{d['name']} 인근 접근점: {alts}"
 
     _add_context(result, d["name"])
-    source = ("OpenTripPlanner (mock) + TAGO 고속버스정보 (국토교통부)"
-              if used_real_bus else "OpenTripPlanner (mock)")
-    return _stamp(result, source)
+    sources = ["OpenTripPlanner (mock)"]
+    if used_real_bus:
+        sources.append("TAGO 고속버스정보 (국토교통부)")
+    if first_leg["used_real"] or last_leg["used_real"]:
+        sources.append("ODsay LAB 대중교통 경로탐색")
+    return _stamp(result, " + ".join(sources))
 
 
 # 게이트가 반환하는 intent → 도구 매핑
@@ -500,9 +588,15 @@ def call_tool(intent: str, slots: dict, carried=()) -> dict:
     """carried: 이번 턴 값이 아니라 직전 턴에서 승계된 슬롯 키 목록.
     "<장소> 근처 X" 류 도구가 기준점을 고를 때(pick_anchor) 승계된 슬롯을
     걸러내는 데 쓴다. 기본값 빈 튜플이라 이 인자를 안 넘기는 기존 호출부
-    (CLI 등)도 그대로 동작한다."""
+    (CLI 등)도 그대로 동작한다.
+
+    origin_coords/destination_coords: 게이트를 우회해 도구로 직접 전달되는
+    좌표(선택). 현재는 plan_journey 만 사용한다 — 다른 도구는 **_ 로
+    무시하므로 안전하게 항상 전달해도 된다."""
     fn = TOOL_MAP.get(intent)
     if fn is None:
         return {"found": False, "reason": "no_tool_for_intent", "intent": intent}
     return fn(origin=slots.get("origin"), destination=slots.get("destination"),
-              datetime_hint=slots.get("datetime"), pax=slots.get("pax"), carried=carried)
+              datetime_hint=slots.get("datetime"), pax=slots.get("pax"), carried=carried,
+              origin_coords=slots.get("origin_coords"),
+              destination_coords=slots.get("destination_coords"))

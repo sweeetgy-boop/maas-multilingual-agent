@@ -94,7 +94,8 @@ def _diversify(within: list[tuple[float, dict]], limit: int) -> list[dict]:
             selected.append(closest)
 
     selected.sort(key=lambda x: x[0])
-    return [{"name": n["name"], "type": n["type"], "distance_m": round(d)} for d, n in selected]
+    return [{"name": n["name"], "type": n["type"], "distance_m": round(d),
+             "lat": n["lat"], "lon": n["lon"]} for d, n in selected]
 
 
 if __name__ == "__main__":

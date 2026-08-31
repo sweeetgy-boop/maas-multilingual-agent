@@ -135,7 +135,12 @@ def merge_slots(new: dict, prev: dict) -> tuple[dict, list[str]]:
     return merged, carried
 
 
-def run(text: str, session_id: str | None = None) -> tuple[dict, str, list[str]]:
+def run(text: str, session_id: str | None = None,
+        origin_coords: dict | None = None, destination_coords: dict | None = None
+        ) -> tuple[dict, str, list[str]]:
+    """origin_coords/destination_coords: 게이트 슬롯 추출보다 우선하는 좌표
+    (선택). 게이트 스키마는 건드리지 않는다 — 좌표는 게이트를 거치지 않고
+    call_tool 로 직접 전달된다. 현재는 plan_journey 만 이를 사용한다."""
     _gc_sessions()
     sid = session_id if session_id in _sessions else str(uuid.uuid4())[:12]
     sess = _sessions.setdefault(sid, {"slots": {}, "at": time.time()})
@@ -147,6 +152,10 @@ def run(text: str, session_id: str | None = None) -> tuple[dict, str, list[str]]
     def patched(intent, slots):
         nonlocal carried
         merged, carried = merge_slots(slots, sess["slots"])
+        if origin_coords:
+            merged["origin_coords"] = origin_coords
+        if destination_coords:
+            merged["destination_coords"] = destination_coords
         return orig(intent, merged, carried=carried)
 
     pipeline.tools.call_tool = patched
@@ -166,10 +175,19 @@ def run(text: str, session_id: str | None = None) -> tuple[dict, str, list[str]]
 
 
 # ─────────────────────────────────────────────────────────
+class Coords(BaseModel):
+    lat: float
+    lon: float
+
+
 class ChatReq(BaseModel):
     message: str = Field(..., max_length=MAX_TEXT_LEN,
                          examples=["서울역에서 부산역 가는 KTX 오늘 오후"])
     session_id: str | None = Field(None, description="멀티턴 유지용. 생략 시 새 세션")
+    origin_coords: Coords | None = Field(
+        None, description="출발지 좌표(예: 내 위치). 주어지면 게이트의 origin 텍스트 해소보다 우선한다")
+    destination_coords: Coords | None = Field(
+        None, description="목적지 좌표. 주어지면 게이트의 destination 텍스트 해소보다 우선한다")
 
 
 class ChatRes(BaseModel):
@@ -215,7 +233,9 @@ def chat(req: ChatReq) -> ChatRes:
     도메인 밖 질문, 유해 표현, 예약 요청은 차단되며 `blocked_by` 에 계층이 표시된다.
     """
     try:
-        r, sid, carried = run(req.message, req.session_id)
+        oc = req.origin_coords.model_dump() if req.origin_coords else None
+        dc = req.destination_coords.model_dump() if req.destination_coords else None
+        r, sid, carried = run(req.message, req.session_id, oc, dc)
     except Exception as e:
         raise HTTPException(502, f"파이프라인 오류: {str(e)[:150]}")
     blocked, layer = classify(r["route"], r.get("reason", "") or "")
