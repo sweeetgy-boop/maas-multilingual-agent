@@ -90,3 +90,69 @@ python score.py --compare results/zeroshot.json results/lora-v1.json results/cpu
 `toxicity` 문항의 비속어는 우회 탐지 테스트용 최소 샘플이다. 실제 운영 전에
 **기관 정책에 맞는 블록리스트로 교체**하고, `s3://.../blocklist/{lang}.json` 에
 언어별 어휘를 채워 넣어야 한다.
+
+## 배포
+
+배포 구조: `로컬 → S3(maas-deploy-508139322599/app/) → EC2(/opt/maas) → systemd(maas-api)`.
+vLLM 은 별도 도커 컨테이너(포트 8000)로 이 배포와 무관하며, 배포 과정에서 절대
+재시작되지 않는다.
+
+### 자동 배포
+
+`main` 브랜치에 푸시하면 두 GitHub Actions 워크플로가 순서대로 돈다.
+
+1. **CI** (`.github/workflows/ci.yml`) — push/PR 모두에서 실행. 문법 검사, `gate/*.json`
+   검증, `eval/testset.jsonl` 검증, `gate/`·`ui/` 모듈 import 검사를 한다. 실제 API
+   호출이나 모델 추론은 하지 않는다.
+2. **Deploy** (`.github/workflows/deploy.yml`) — `main` 에서 CI가 성공한 뒤에만
+   `workflow_run` 트리거로 실행. `gate/`, `ui/` 를 S3 에 동기화하고, SSM 으로 EC2 에서
+   `git pull` 대신 `aws s3 sync` + `systemctl restart maas-api` 를 실행한 뒤 헬스체크
+   (`/v1/health`)까지 확인한다.
+
+**EC2 인스턴스가 정지 중이면 배포가 건너뛰어진다.** 교육 계정이라 비용 절감을 위해
+자주 정지해 두는데, 이때 워크플로를 실패(빨간불)로 만들지 않고 "배포 건너뜀"으로
+성공 처리한다 — Actions 탭의 Job Summary 에 사유가 남는다. 인스턴스를 다시 켠 뒤
+`main` 에 빈 커밋이라도 푸시하면 그 시점 코드로 배포된다.
+
+`.github/workflows/` 만 변경된 커밋도 배포를 건너뛴다 (앱 코드가 안 바뀌었으므로).
+
+배포 실패 시 이전 버전으로 **자동 롤백하지 않는다** — S3 버전 관리가 꺼져 있어
+수동 복구가 더 안전하다. 실패하면 Actions 로그에 원인(SSM 명령 오류, 헬스체크
+실패 등)이 남으니 그걸 보고 원인을 고친 뒤 다시 푸시한다.
+
+### 수동 배포 (기존 절차)
+
+```bash
+# 1) S3 동기화
+aws s3 sync gate/ s3://maas-deploy-508139322599/app/gate/ --delete \
+  --exclude "__pycache__/*" --exclude "*.db" --exclude "*.zip"
+aws s3 sync ui/ s3://maas-deploy-508139322599/app/ui/ --delete \
+  --exclude "__pycache__/*"
+
+# 2) EC2 에 SSM 으로 배포 명령 전송
+aws ssm send-command \
+  --instance-ids i-008500ef9e7c53aec \
+  --document-name "AWS-RunShellScript" \
+  --parameters 'commands=[
+    "cd /opt/maas",
+    "aws s3 sync s3://maas-deploy-508139322599/app/ . --delete",
+    "systemctl restart maas-api"
+  ]'
+
+# 3) 확인
+curl -sf http://<EC2 공인 IP>:8080/v1/health
+```
+
+### systemd 환경변수 변경
+
+`MAAS_API_KEY`, `VLLM_URL`, `GUARDRAIL_ID` 등 API 키·설정값은 EC2 의 systemd 유닛
+파일(`/etc/systemd/system/maas-api.service` 등)에 있다. GitHub Actions 워크플로는
+이 값들을 전혀 다루지 않으므로, 바꾸려면 **EC2 에 직접 접속**해야 한다 (SSM
+Session Manager 권장 — SSH 키 관리 불필요).
+
+```bash
+aws ssm start-session --target i-008500ef9e7c53aec
+sudo systemctl edit maas-api        # 또는 유닛 파일 직접 수정
+sudo systemctl daemon-reload
+sudo systemctl restart maas-api
+```

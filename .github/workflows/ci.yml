@@ -1,0 +1,62 @@
+name: CI
+
+# deploy.yml 이 이 워크플로 이름("CI")을 workflow_run 트리거로 참조한다.
+# 이름을 바꾸면 deploy.yml 의 `workflows: ["CI"]` 도 같이 바꿔야 한다.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      - name: 문법 검사 (py_compile)
+        run: git ls-files '*.py' | xargs -n1 python -m py_compile
+
+      - name: JSON 검증 (gate/*.json)
+        run: |
+          python - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          files = sorted(Path("gate").glob("*.json"))
+          bad = []
+          for p in files:
+              try:
+                  json.loads(p.read_text(encoding="utf-8"))
+              except json.JSONDecodeError as e:
+                  bad.append(f"{p}: {e}")
+
+          if bad:
+              print("\n".join(bad))
+              sys.exit(1)
+          print(f"{len(files)}개 JSON 파일 모두 유효: {[p.name for p in files]}")
+          PY
+
+      - name: 평가셋 검증 (eval/testset.jsonl)
+        run: python scripts/ci_check_testset.py eval/testset.jsonl
+
+      - name: import 검사 (gate/, ui/)
+        # 실제 API 호출·모델 추론은 하지 않는다. gate/pipeline.py 가 모듈
+        # 최상단에서 boto3.client("bedrock-runtime", ...) 을 만드는데
+        # (ui/api.py, gate/api.py, ui/server.py, gate/server.py, */eval_endpoint.py
+        # 가 이를 통해 물려 들어온다), 정적 자격 증명이 전혀 없으면 최신
+        # botocore 가 SSO 류 폴백 공급자를 시도하다 죽는다. 여기 더미 값은
+        # boto3.client() 생성만 통과시키기 위한 것이고, 실제 호출은 절대
+        # 일어나지 않으므로 네트워크로 나가지 않는다.
+        env:
+          AWS_ACCESS_KEY_ID: dummy-ci-key
+          AWS_SECRET_ACCESS_KEY: dummy-ci-secret
+          AWS_DEFAULT_REGION: ap-northeast-2
+        run: python scripts/ci_check_imports.py
