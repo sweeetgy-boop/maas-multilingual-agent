@@ -2,6 +2,19 @@
 
 3일 실증에서 **제로샷 / LoRA / CPU 인코더** 세 구성을 동일 기준으로 비교하기 위한 평가셋.
 
+## 아키텍처
+
+```
+사용자 → DuckDNS → Elastic IP → 보안그룹(80/443만 공개) → Caddy(HTTPS)
+       → maas-api(:8080) / maas-ui(:7860) → vLLM(Qwen3-4B) + Bedrock(Haiku)
+                                           → 카카오/서울시/공공데이터포털/ODsay
+
+GitHub(main) → CodePipeline → CodeBuild(검증) → CodeDeploy → EC2 systemd
+```
+
+전체 인프라·CI/CD·요청 처리 흐름·EC2 내부 구성 다이어그램과 리소스 목록,
+운영 절차는 **[docs/architecture/](docs/architecture/README.md)** 참고.
+
 ## 구성
 
 | 언어 | 문항 |
