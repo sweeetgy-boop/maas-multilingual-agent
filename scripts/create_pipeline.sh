@@ -19,7 +19,7 @@ CODEBUILD_PROJECT="maas-build"
 PIPELINE_NAME="maas-pipeline"
 ARTIFACT_BUCKET="maas-pipeline-508139322599"
 
-CONNECTION_ARN="arn:aws:codeconnections:ap-northeast-2:508139322599:connection/86997153-b249-4473-854f-573b139eaea7"
+CONNECTION_ARN="arn:aws:codeconnections:ap-northeast-2:508139322599:connection/e270b1df-ef5b-4f25-9417-520238e03816"
 REPO_ID="sweeetgy-boop/maas-multilingual-agent"
 BRANCH="main"
 

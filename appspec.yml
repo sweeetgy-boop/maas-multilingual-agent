@@ -7,6 +7,8 @@ files:
   - source: ui
     destination: /opt/maas/ui
 
+  - source: requirements.txt
+    destination: /opt/maas
 file_exists_behavior: OVERWRITE
 
 hooks:
