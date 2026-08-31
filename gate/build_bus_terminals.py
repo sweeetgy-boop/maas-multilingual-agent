@@ -103,7 +103,7 @@ def build() -> dict:
         grades_raw = _call(client, "GetExpBusGradList")
 
     cities = [{"code": c["cityCode"], "name": c["cityName"]} for c in cities_raw]
-    grades = [{"code": g["gradeId"], "name": g["gradeNm"]} for g in grades_raw]
+    grades = [{"id": g["gradeId"], "name": g["gradeNm"]} for g in grades_raw]
 
     bus_nodes = _load_transit_bus_nodes()
     terminals = []
@@ -123,10 +123,20 @@ def build() -> dict:
 def main() -> None:
     data = build()
     OUT_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
-    with_coords = sum(1 for t in data["terminals"] if t["lat"] is not None)
-    with_city = sum(1 for t in data["terminals"] if t["city_code"] is not None)
-    print(f"터미널 {len(data['terminals'])}개 (좌표 {with_coords}개, 도시매칭 {with_city}개), "
-          f"도시 {len(data['cities'])}개, 등급 {len(data['grades'])}개 → {OUT_PATH}",
+
+    total = len(data["terminals"])
+    no_coords = [t["name"] for t in data["terminals"] if t["lat"] is None]
+    no_city = [t["name"] for t in data["terminals"] if t["city_code"] is None]
+    print(f"터미널 {total}개, 도시 {len(data['cities'])}개, 등급 {len(data['grades'])}개 "
+          f"→ {OUT_PATH}", file=sys.stderr)
+    # 좌표·도시 보완은 best-effort 다. 실패 건수를 명시적으로 남겨야 캐시를
+    # 다시 만들 때 품질이 나빠졌는지(예: transit_nodes.json 이 줄었는지)
+    # 눈에 띈다. 좌표 미보완은 정상이다 — transit_nodes 에는 주요 터미널만 있다.
+    print(f"  좌표 보완 실패 {len(no_coords)}/{total}건 "
+          f"(예: {', '.join(no_coords[:5])}{' …' if len(no_coords) > 5 else ''})",
+          file=sys.stderr)
+    print(f"  도시 매칭 실패 {len(no_city)}/{total}건 "
+          f"(예: {', '.join(no_city[:5])}{' …' if len(no_city) > 5 else ''})",
           file=sys.stderr)
 
 

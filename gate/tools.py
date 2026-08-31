@@ -244,9 +244,16 @@ def search_rail(origin: str | None, destination: str | None,
     return _stamp(result, "KORAIL/SR OpenAPI (mock)")
 
 
+# TAGO 실데이터가 없을 때(키 미설정·쿼터 소진·API 장애)만 쓰는 목값.
+# 실서비스 요금대에 맞춰 두되, data_source 에 (mock) 이 찍히므로 사용자와
+# 평가기 모두 실데이터와 구별할 수 있다. 주요 도시간 조합을 비워 두면
+# 폴백이 "노선 없음"으로 답해 버려서, 실제로 있는 노선을 없다고 말하게 된다.
 BUS_TABLE = {
     ("DONGSEOUL", "SOKCHO"): [("동서울-속초 우등", 145, 22400), ("동서울-속초 일반", 160, 15200)],
     ("SEOUL", "SEOSAN"): [("서울-서산 우등", 118, 14300), ("서울-서산 일반", 130, 9700)],
+    ("SEOUL", "BUSAN"): [("서울경부-부산 우등", 250, 39700), ("서울경부-부산 고속", 260, 26700)],
+    ("SEOUL", "DAEJEON"): [("서울경부-대전복합 우등", 120, 16600), ("서울경부-대전복합 고속", 125, 11400)],
+    ("DONGSEOUL", "RAIL-강릉"): [("동서울-강릉 우등", 150, 22300), ("동서울-강릉 고속", 160, 15100)],
     ("BUSAN", "PUS"): [("부산역-김해공항 리무진", 55, 7500)],
     ("ICN", "SEOUL"): [("공항리무진 6001", 70, 18000), ("공항리무진 6015", 85, 18000)],
 }
@@ -287,7 +294,17 @@ def search_bus(origin=None, destination=None, datetime_hint=None, pax=None, carr
             result = _bus_result_from_expbus(real, pax)
             if result["found"]:
                 _add_context(result, d["name"])
-            return _stamp(result, "TAGO 고속버스정보 (국토교통부, 공공데이터포털)")
+            # 고속버스 시간표는 D+2 까지만 공개된다. 더 뒤 날짜를 물으면
+            # 조회 가능한 마지막 날로 당겨 조회되므로, 요청한 날짜의
+            # 시간표가 아니라는 사실을 disclaimer 에 실어 보낸다
+            # (Supervisor 규칙 6 이 disclaimer 를 반드시 출력한다).
+            note = None
+            if real.get("date_clamped"):
+                shown = datetime.strptime(real["date"], "%Y%m%d").strftime("%Y-%m-%d")
+                note = (f"고속버스 시간표는 오늘부터 2일 뒤까지만 공개됩니다. "
+                        f"문의하신 날짜 대신 조회 가능한 마지막 날짜({shown}) 기준으로 "
+                        f"안내합니다. 이후 날짜는 예매 개시 후 확인하세요.")
+            return _stamp(result, "TAGO 고속버스정보 (국토교통부, 공공데이터포털)", note)
 
         rows = BUS_TABLE.get((o["id"], d["id"])) or BUS_TABLE.get((d["id"], o["id"]))
         if rows:
@@ -639,7 +656,11 @@ def plan_journey(origin=None, destination=None, datetime_hint=None, pax=None,
 
     used_real_bus = False
     if d_hub["type"] == "bus_terminal":
-        real = expbus_api.search(o["name"], d_hub["name"], base.strftime("%Y%m%d"))
+        # 사용자가 쓴 원문 지명("서울")을 넘긴다. o["name"] 은 해소된 접근점
+        # 이름("서울역")이라 고속터미널로 매핑되지 않아(철도역명은 의도적으로
+        # 매핑하지 않는다) 실요금을 놓친다. search_bus 도 원문을 넘긴다.
+        dep_text = origin or o["name"]
+        real = expbus_api.search(dep_text, d_hub["name"], base.strftime("%Y%m%d"))
         if real and real.get("found") and real.get("buses"):
             first = real["buses"][0]
             if "duration_min" in first:
