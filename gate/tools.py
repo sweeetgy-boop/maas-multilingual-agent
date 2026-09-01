@@ -69,13 +69,46 @@ def _subway_not_covered(requested: str | None) -> dict:
         # 도시 단서가 없어 같은 역명이 여러 도시에 걸린 경우(예: "시청"은
         # 서울·부산·대전에 있다). 호출부가 어느 도시인지 되물어야 한다.
         "ambiguous": hit["ambiguous"],
-        # 이 키가 있는 한 시각표는 없다. Supervisor 규칙 11 이 이 문구를
-        # 반드시 함께 전달한다.
+        # 이 키가 있는 한 시각표는 없다. Supervisor 의 COVERAGE_SYSTEM 이
+        # 이 문구를 반드시 함께 전달한다.
         "timetable_available": False,
         "station_note": ("노선·환승 정보만 제공됩니다. 실시간 도착정보와 "
                          "운행 시각표는 제공 범위 밖입니다."),
     }
     return base
+
+def is_metro_query(text: str | None, rail_station: str | None = None) -> bool:
+    """이 지명이 간선철도역이 아니라 도시철도역을 가리키는가.
+
+    도시 별칭 때문에 지하철 질의가 간선철도로 새는 것을 막는다. "부산 서면역"은
+    PLACE_ALIASES 의 "부산"에 걸려 부산역(간선철도)으로 해소되고, 코레일 키가
+    없으면 목 데이터까지 나가 버린다 — 부산 지하철을 물었는데 경부선 목
+    데이터가 답이 되는 셈이다.
+
+    판정은 **양쪽이 질의의 어느 토큰에 맞았는지**를 견줘서 한다. 도시명만 보고
+    가릴 수는 없다 — "대구"는 PLACE_ALIASES 에서 동대구역으로, "광주"는
+    광주송정역으로 해소돼 도시명 검사를 그냥 빠져나간다.
+
+      "부산 서면역"   지하철 "서면"   vs 철도 "부산"    → 다르다 → 지하철
+      "대구 반월당역"  지하철 "반월당"  vs 철도 "동대구"   → 다르다 → 지하철
+      "광화문역"      지하철 "광화문"  vs 철도 없음      → 다르다 → 지하철
+      "동대구역"      지하철 "동대구"  vs 철도 "동대구"   → 같다   → 철도
+      "서울역"        지하철 "서울"    vs 철도 "서울"     → 같다   → 철도
+      "부산역"        지하철이 도시명 토큰으로만 걸림      → 철도
+
+    즉 철도 쪽이 제 이름으로 맞은 경우에만 철도로 남고, 도시 별칭을 타고 엉뚱한
+    역으로 번진 경우에는 지하철 질의로 본다.
+
+    rail_station 은 이미 구한 간선철도 역명이 있으면 넘긴다(중복 해소 방지).
+    없으면 여기서 resolve_place 로 구한다.
+    """
+    sub = subway_stations.find_station(text)
+    if not sub or sub["matched_city_token"]:
+        return False
+    if rail_station is None:
+        rail_station = _rail_station_name(resolve_place(text))
+    return sub["matched_name"] != subway_stations.normalize(rail_station or "")
+
 
 # ── 지명 정규화 사전 (다국어 별칭 → 표준 ID) ──
 # 실제로는 임베딩 + FAISS 로 처리하지만, PoC 는 사전으로 충분하다.
@@ -274,9 +307,23 @@ def _rail_result_from_api(real: dict, o: dict, d: dict, pax: int | None) -> dict
 
 
 def search_rail(origin: str | None, destination: str | None,
-                datetime_hint: str | None = None, pax: int | None = None, **_) -> dict:
+                datetime_hint: str | None = None, pax: int | None = None,
+                carried=(), **_) -> dict:
     o, d = resolve_place(origin), resolve_place(destination)
     if not o or not d:
+        # 도시철도역 단건 질의("부산 서면역 지하철 시간표")가 여기로 온다.
+        # 게이트는 "시간표"를 보고 search_rail 로 보내는데(GATE_SYSTEM intent
+        # guide), 구간이 아니라 역 하나뿐이라 _unresolved 로 떨어져 "출발지와
+        # 도착지를 다시 확인해 주세요" 가 나갔다 — 역은 실재하고 노선도 아는데
+        # 못 찾았다고 답한 셈이다.
+        #
+        # get_realtime_status 로 넘긴다. 그쪽이 이미 서울 121장소 안이면
+        # 실시간 도착정보, 밖이면 _subway_not_covered(노선·환승 정보)로
+        # 가르는 분기를 갖고 있어 여기서 되풀이할 이유가 없다.
+        lone = origin if (origin and not destination) else (
+            destination if (destination and not origin) else None)
+        if lone and is_metro_query(lone):
+            return get_realtime_status(origin=lone, carried=carried)
         return _unresolved(origin, o, destination, d, "KORAIL/SR OpenAPI (mock)")
 
     # 코레일 실데이터를 먼저 시도한다. 목 데이터의 "KTX 101 / 59,800원"은
@@ -585,26 +632,7 @@ def get_realtime_status(origin=None, destination=None, pax=None, carried=(), **_
         # "경부선" 처럼 역이 아니라 노선을 가리킨 경우도 철도 질의다.
         line = None if station else _rail_line_name(anchor)
 
-        # 도시 별칭 때문에 지하철 질의가 간선철도로 새는 것을 막는다.
-        # "부산 서면역"은 PLACE_ALIASES 의 "부산"에 걸려 부산역(간선철도)으로
-        # 해소되고, 코레일 키가 없으면 목 데이터까지 나가 버린다 — 부산 지하철을
-        # 물었는데 경부선 목 데이터가 답이 되는 셈이다.
-        #
-        # 판정은 **양쪽이 질의의 어느 토큰에 맞았는지**를 견줘서 한다. 도시명만
-        # 보고 가릴 수는 없다 — "대구"는 PLACE_ALIASES 에서 동대구역으로,
-        # "광주"는 광주송정역으로 해소돼 도시명 검사를 그냥 빠져나간다.
-        #
-        #   "부산 서면역"  지하철 "서면"  vs 철도 "부산"      → 다르다  → 지하철
-        #   "대구 반월당역" 지하철 "반월당" vs 철도 "동대구"    → 다르다  → 지하철
-        #   "동대구역"     지하철 "동대구" vs 철도 "동대구"    → 같다    → 철도
-        #   "서울역"       지하철 "서울"   vs 철도 "서울"      → 같다    → 철도
-        #   "부산역"       지하철이 도시명 토큰으로만 걸림       → 철도
-        #
-        # 즉 철도 쪽이 제 이름으로 맞은 경우에만 철도로 남고, 도시 별칭을 타고
-        # 엉뚱한 역으로 번진 경우에는 지하철 질의로 본다.
-        sub = subway_stations.find_station(anchor)
-        if (sub and not sub["matched_city_token"]
-                and sub["matched_name"] != subway_stations.normalize(station or "")):
+        if is_metro_query(anchor, station):
             return _subway_not_covered(anchor)
 
         if station or line:

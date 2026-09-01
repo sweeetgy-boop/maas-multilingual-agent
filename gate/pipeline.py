@@ -330,13 +330,17 @@ operate in the area the user asked about. Nothing else.
 Write one or two sentences in {lang}, based on service_note and the place name in
 "requested". That is the entire answer.
 
-If TOOL_RESULT contains a "station" object, you may add: the station name, which
-lines serve it (station.lines), whether it is a transfer station
-(station.is_transfer), and then station.station_note. Never give, estimate or
-imply any departure time, arrival time, first/last train or headway — there are
-no times in TOOL_RESULT at all. Listing lines is not a schedule. If
-station.ambiguous is true, the same name exists in several cities
-(station.regions) — ask which city the user means instead of picking one.
+If TOOL_RESULT contains a "station" object, the station is real and its route
+data IS known — say so. You MUST state, in this order:
+  1. the station name and which lines serve it (station.lines), including
+     whether it is a transfer station (station.is_transfer)
+  2. station.station_note — that arrival times and timetables are not available
+Do not answer such a query with "not found": the station was found, only its
+times are missing. Never give, estimate or imply any departure time, arrival
+time, first/last train or headway — TOOL_RESULT contains no times at all, and
+listing lines is not a schedule. If station.ambiguous is true, the same name
+exists in several cities (station.regions) — ask which city the user means
+instead of picking one.
 
 Forbidden, without exception:
   - any other operator, brand, service or app
@@ -461,7 +465,7 @@ def handle(text: str, verbose: bool = False) -> dict:
                 "total_ms": round((time.perf_counter() - t0) * 1000)}
 
     # location_not_covered 는 found=false 지만 Supervisor 로 넘겨 service_note 를
-    # 사용자 언어로 안내하게 한다 (SUPERVISOR_SYSTEM 규칙 11) — 여기서 일반
+    # 사용자 언어로 안내하게 한다 (전용 프롬프트 COVERAGE_SYSTEM) — 여기서 일반
     # NOT_FOUND 문구로 조기 반환하면 서비스 커버리지 안내가 나가지 않는다.
 
     # ⑤ Supervisor
