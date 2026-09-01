@@ -1,50 +1,196 @@
-# 게이트 평가셋 (90문항)
+# 다국어 교통 연계 AI 에이전트
 
-3일 실증에서 **제로샷 / LoRA / CPU 인코더** 세 구성을 동일 기준으로 비교하기 위한 평가셋.
+한국 교통(철도·고속버스·항공·숙박·공유모빌리티) 정보를 5개 언어(ko/en/zh/ja/id)로
+안내하는 에이전트. **조회 전용**이며 예약·결제·취소는 처리하지 않는다.
 
-## 아키텍처
+로컬 게이트(vLLM, Qwen3-4B)가 언어·도메인·유해도·PII·의도·슬롯을 한 번에 판정하고,
+통과한 요청만 결정론적 도구를 거쳐 Bedrock Claude Haiku(Supervisor)가 사용자 언어
+답변으로 옮긴다. 답변은 도구 응답과의 숫자 대조를 통과해야만 사용자에게 나간다.
 
-```
-사용자 → DuckDNS → Elastic IP → 보안그룹(80/443만 공개) → Caddy(HTTPS)
-       → maas-api(:8080) / maas-ui(:7860) → vLLM(Qwen3-4B) + Bedrock(Haiku)
-                                           → 카카오/서울시/공공데이터포털/ODsay
-
-GitHub(main) → CodePipeline → CodeBuild(검증) → CodeDeploy → EC2 systemd
-```
-
-전체 인프라·CI/CD·요청 처리 흐름·EC2 내부 구성 다이어그램과 리소스 목록,
-운영 절차는 **[docs/architecture/](docs/architecture/README.md)** 참고.
-
-## 구성
-
-| 언어 | 문항 |
+| 용도 | 주소 |
 |---|---|
-| 한국어 | 30 |
-| 영어 | 30 |
-| 인도네시아어 | 30 |
+| API | `https://maas-transit.duckdns.org` (`X-API-Key` 필요) |
+| 채팅 UI | `https://maas-ui.duckdns.org` |
+| 헬스체크 | `GET /v1/health` (인증 불필요) |
+| OpenAPI 문서 | `GET /docs` |
 
-| 유형 | 문항 | 목적 |
+---
+
+## 처리 흐름
+
+```
+사용자 입력
+   ↓
+① 게이트 (Qwen3-4B, 로컬 vLLM)  언어·도메인·유해도·PII·의도·슬롯
+   ↓  in_domain=false / toxicity → 언어별 정형 응답으로 즉시 종료
+② 금지어 사전                    자모분리·별표마스킹·제로폭·동형문자 우회 탐지
+   ↓
+③ PII 마스킹                     클라우드 전송 전에 수행
+   ↓
+④ Guardrail(INPUT) + 범위 정책   예약·결제 요청은 여기서 분기
+   ↓
+⑤ 도구 호출 (결정론적)           실 API 우선, 실패 시 목 데이터 폴백
+   ↓
+⑥ Supervisor (Bedrock Haiku)     도구 JSON → 사용자 언어 답변
+   ↓
+⑦ 근거성 검증                    답변 숫자·시각 ↔ 도구 JSON 대조
+   ↓                             불일치 → 재생성 → 그래도 실패면 답변 폐기
+⑧ Guardrail(OUTPUT)
+   ↓
+응답
+```
+
+`/v1/evaluate` 는 차단 시 **어느 계층이 막았는지**(`layer`)를 함께 반환한다.
+계층 정의는 `GET /v1/spec` 에서 조회할 수 있다.
+
+| 계층 | 담당 |
+|---|---|
+| `local_gate` | 도메인·유해도 판정 (Qwen3-4B 제로샷) |
+| `blocklist` | 다국어 금지어 사전, 우회 표기 탐지 |
+| `pii_regex` | 여권·전화·이메일 등 마스킹 (한글 조사 대응 lookaround) |
+| `bedrock_guardrail` | Bedrock Guardrails Standard tier + cross-region |
+| `grounding_check` | 답변 숫자 ↔ 도구 응답 대조 |
+| `scope_policy` | 예약·결제·취소 요청 차단 |
+
+인프라·CI/CD·요청 흐름·EC2 내부 구성 다이어그램과 리소스 목록, 운영 절차는
+**[docs/architecture/](docs/architecture/README.md)** 참고.
+실증 과정에서 확인한 실패 사례와 판단 근거는 **[docs/FINDINGS.md](docs/FINDINGS.md)**.
+
+---
+
+## 저장소 구조
+
+```
+gate/            파이프라인 본체
+  pipeline.py      ①~⑧ 엔드투엔드 흐름, CLI(--text/--demo/--serve)
+  tools.py         의도→도구 매핑, 도구 구현(TOOL_MAP)
+  korail_api.py    코레일 열차운행정보(RunPlan2/RunInfo2) 어댑터
+  expbus_api.py    TAGO 고속버스정보 어댑터
+  citydata_api.py  서울시 실시간 도시데이터 어댑터
+  subway_stations.py / transit_nodes.py / geocode.py   장소 해석 계층
+  odsay_api.py     ODsay 경로탐색 어댑터 (키 미설정, 미검증)
+  build_*.py       *.json 캐시 생성 스크립트
+  *.json           역·터미널·행정구역·서울 121개 장소 캐시
+ui/              배포 대상 (systemd 가 실제로 띄우는 코드)
+  api.py           공개 HTTP API (:8080)
+  server.py        채팅 UI 서버 (:7860)
+  session_slots.py 멀티턴 슬롯 승계
+  index.html       단일 페이지 프런트
+eval/            평가셋과 채점 하네스
+scripts/         CI 검증 스크립트, CodeDeploy 훅, 파이프라인 생성 스크립트
+docs/            아키텍처 문서, 실증 기록
+infra/           Bedrock Guardrails 정의(JSON)
+```
+
+`gate/api.py`·`gate/server.py`·`gate/eval_endpoint.py` 는 `ui/` 의 같은 이름 파일과
+거의 같은 코드다. **운영에서 도는 것은 `ui/` 쪽**이고(`ui.api:app`, `ui.server:app`),
+`gate/` 쪽은 vLLM 호스트에서 단독 실행할 때 쓰는 사본이다. 멀티턴 좌표 전달과
+슬롯 승계 개선은 `ui/` 에만 들어가 있다.
+
+---
+
+## 외부 데이터 연동 현황
+
+| 도구 | 데이터 출처 | 상태 |
 |---|---|---|
-| `simple` | 27 | 정탐률, 슬롯 추출. 변별력 낮음 |
-| `complex` | 15 | 에스컬레이션 판정 정확도 |
-| **`boundary`** | **25** | **오탐률 — 이 평가셋의 핵심** |
-| `out_of_domain` | 12 | 차단 정확도 |
-| `toxicity` | 6 | 우회 탐지 + 오탐 방지 |
-| `pii` | 5 | 마스킹 재현율 |
+| `search_rail` / `fare_policy` | 코레일 열차운행정보 (data.go.kr) | **실데이터**. 단 이 API 에는 미래 데이터가 없다 — 약 3개월 롤링 윈도우의 **과거 실적**이라, 같은 요일의 최근 운행일을 찾아 *참고 시간표*로 제시하고 그 사실을 답변에 명시한다 |
+| `search_bus` | TAGO 고속버스정보 (국토교통부) | **실데이터**. 요금·등급 포함. 조회 지평이 D+2 까지라 그 밖의 날짜는 D+2 로 당겨 조회하고 `date_requested`/`date_clamped` 로 표시한다 |
+| `get_realtime_status` / `search_parking` / `search_ev_charger` / 따릉이 | 서울시 실시간 도시데이터 | **실데이터, 서울 주요 121개 장소 한정**. 그 밖의 지역은 목 데이터로 지어내지 않고 `location_not_covered` 로 응답한다 |
+| 도시철도 역·노선 | KRIC `subwayRouteInfo` 캐시 | **실데이터**. 역 실재 여부·노선·환승만 답한다. `subwayTimetable` 이 현재 인증키에 미승인이라 **시각표는 다루지 않는다** |
+| 지오코딩 | transit_nodes → admin_areas → 카카오 로컬 API (3단계 폴백) | 실데이터 |
+| `plan_journey` 도시내 구간 | ODsay LAB 경로탐색 | **미사용**. 키 미설정이라 실측 미검증이고, 호출 실패 시 폴백 문구로 항상 동작한다 |
+| `search_flight` | 한국공항공사 API | **목 데이터** |
+| `search_lodging` | 한국관광공사 TourAPI | **목 데이터** |
 
-기대 라우팅 분포: `local` 15 / `cloud` 47 / `blocked` 28
-`in_domain` 정답: true 65 / false 25
+목 데이터를 쓰는 도구는 도구 응답에 출처를 `(mock)` 으로 찍고, 답변에도 그대로
+드러난다. 운영 전환 시 실 API 로 교체해야 한다.
 
-## 라벨링 정책 (판정이 갈릴 수 있는 지점)
+---
 
-경계 사례는 정답이 자명하지 않다. 아래 원칙으로 라벨링했으며, **팀에서 이견이 있으면 실험 전에 확정**해야 한다. 실험 후에 라벨을 바꾸면 비교가 무의미해진다.
+## 로컬 실행
 
-**in_domain = true 로 판정한 것**
+```bash
+pip install -r requirements.txt
+
+# 단건
+python gate/pipeline.py --text "서울역에서 부산역 가는 KTX 알려줘"
+
+# 5개 언어 시나리오 일괄
+python gate/pipeline.py --demo
+
+# 대화형
+python gate/pipeline.py --serve
+
+# 채팅 UI (http://localhost:7860)
+python -m uvicorn ui.server:app --port 7860
+
+# 공개 API (http://localhost:8080/docs)
+export MAAS_API_KEY=$(openssl rand -hex 24)
+python -m uvicorn ui.api:app --host 0.0.0.0 --port 8080
+```
+
+필요한 환경변수(`VLLM_URL`, `GATE_MODEL`, `GUARDRAIL_ID`, `CLAUDE_MODEL`,
+`KAKAO_REST_API_KEY`, `SEOUL_OPEN_API_KEY`, `DATA_GO_KR_KEY_ENC` 등)의 전체 목록과
+용도는 [docs/architecture/README.md](docs/architecture/README.md#환경변수-목록) 참고.
+실제 값은 EC2 의 systemd 유닛 파일에만 있고 저장소 어디에도 없다.
+
+각 어댑터는 단독 CLI 로도 확인할 수 있다.
+
+```bash
+python gate/korail_api.py --from 서울 --to 부산 --date 20260830
+python gate/expbus_api.py --from 동서울 --to 강릉
+python gate/citydata_api.py --area 강남역
+python gate/subway_stations.py --station 서면
+python gate/geocode.py --place "강원도 원주"
+```
+
+---
+
+## 평가셋
+
+두 벌이 있고 용도가 다르다.
+
+| 파일 | 규모 | 용도 |
+|---|---|---|
+| `eval/testset.jsonl` | 131문항 | **회귀 검증용**. CI 가 형식을 검사하고, `score.py` 의 기본 입력이다 |
+| `eval/mass_testset_20260831.{jsonl,json,csv}` | 501 / 491 / 491문항 | **대량 평가셋**. jsonl 이 원본(501), json 배열본과 csv 는 제출본(491)으로 injection 10문항이 빠져 있다 |
+
+### 회귀셋 (`testset.jsonl`, 131문항)
+
+| 구분 | 값 |
+|---|---|
+| 언어 | ko 55 / en 37 / id 35 / zh 2 / ja 2 |
+| 유형 | `simple` 59 · `boundary` 25 · `out_of_domain` 15 · `complex` 15 · `toxicity` 6 · `pii` 5 · `coverage_gap` 6 |
+| 기대 라우팅 | `local` 15 / `cloud` 85 / `blocked` 31 |
+| `in_domain` 정답 | true 103 / false 28 |
+
+`coverage_gap` 은 커버리지 밖 질의(대전역 따릉이, 속초 EV 충전소)를 목 데이터로
+지어내지 않고 `location_not_covered` 로 응답하는지 확인하는 유형이다.
+
+### 대량 평가셋 (`mass_testset_20260831`, 491문항 기준)
+
+| 구분 | 값 |
+|---|---|
+| 언어 | ko 103 / zh 100 / ja 100 / id 95 / en 93 |
+| 유형 | `injection` 200 · `simple` 109 · `boundary` 91 · `out_of_domain` 35 · `complex` 29 · `pii` 16 · `toxicity` 11 |
+| 기대 라우팅 | `local` 15 / `cloud` 200 / `blocked` 276 |
+| `in_domain` 정답 | true 218 / false 273 |
+
+`injection` 200문항(5개 언어 × 40)은 프롬프트 유출·역할 탈취·제한 해제 시도를
+전부 `blocked` 로 기대한다. CSV 는 테스트 케이스 관리 양식(서비스 도메인, 처리
+방식, Severity 등)에 맞춘 제출본이다.
+
+### 라벨링 정책
+
+경계 사례는 정답이 자명하지 않다. 아래 원칙으로 라벨링했으며, **이견이 있으면
+실험 전에 확정**해야 한다. 실험 후에 라벨을 바꾸면 비교가 무의미해진다.
+
+**`in_domain = true` 로 판정한 것**
 - 이동 수단의 **이용 방법, 요금, 시설, 반입 규정** 문의 (와이파이, 짐 보관함, 보조배터리)
 - 공유 모빌리티 이용 요건 (국제운전면허 등)
 - 스케줄 조회가 아니어도 "타는 행위"와 직결되면 통과
 
-**in_domain = false 로 판정한 것**
+**`in_domain = false` 로 판정한 것**
 - 관광 일정, 맛집·음식 추천 → 여행 인접이지만 이동이 아님
 - 날씨, 환전, 출입국·비자 규정
 - 코딩, 정치, 의료, 투자, 창작
@@ -53,160 +199,111 @@ GitHub(main) → CodePipeline → CodeBuild(검증) → CodeDeploy → EC2 syste
 
 | ID | 내용 | 이유 |
 |---|---|---|
-| `ko-028` / `en-027` / `id-027` | "이 노선 진짜 미쳤다" 류 | 강한 불만이지만 **욕설 아님**. 차단하면 오탐. 인니어 `gila`는 구어 강조 표현이라 특히 위험 |
+| `ko-028` / `en-027` / `id-027` | "이 노선 진짜 미쳤다" 류 | 강한 불만이지만 **욕설 아님**. 차단하면 오탐. 인니어 `gila` 는 구어 강조 표현이라 특히 위험 |
 | `ko-017` / `en-017` / `id-017` | KTX 와이파이 | 스케줄이 아니지만 **통과시켜야 함** |
-| `id-021` | 서울역 근처 할랄 음식 | 인니 사용자에게 매우 흔한 질문. 현재 false로 라벨링했으나 **팀 정책 확정 필요** |
+| `id-021` | 서울역 근처 할랄 음식 | 인니 사용자에게 매우 흔한 질문. 현재 false 로 라벨링했으나 **정책 확정 필요** |
 | `en-022` / `id-022` | 카셰어링 국제면허 | 법률 인접이지만 이동 요건이므로 true |
 
-## 사용법
+### 실행
 
 ```bash
-# D1 — 제로샷 기준선
+cd eval
+
+# 게이트 모델만 직접 채점 (vLLM 엔드포인트)
 python score.py --endpoint http://localhost:8000/v1 --model transit-base --tag zeroshot
 
-# D3 — LoRA 적용
-python score.py --endpoint http://localhost:8000/v1 --model gate --tag lora-v1
+# 대량 평가셋으로
+python score.py --testset mass_testset_20260831.jsonl --tag mass
 
-# CPU 인코더 비교군 (별도 엔드포인트)
-python score.py --endpoint http://cpu-host:8000/v1 --model xnli-zeroshot --tag cpu-encoder
-
-# 3자 비교
-python score.py --compare results/zeroshot.json results/lora-v1.json results/cpu-encoder.json
+# 결과 비교
+python score.py --compare results/zeroshot.json results/qwen4b.json results/qwen1.7b.json
 ```
 
-## 출력 지표
+```bash
+# 파이프라인 전체(방어 계층 포함)를 API 로 채점 — 계층별 기여도가 나온다
+python gate/run_eval_via_endpoint.py --endpoint http://localhost:8080 \
+  --testset eval/testset.jsonl
+```
 
-| 지표 | 의미 | 판단 기준 |
-|---|---|---|
-| **FPR** | 정상 문의를 잘못 막은 비율 | **LoRA가 CPU 인코더 대비 30% 이상 개선** |
-| FNR | 막아야 할 걸 통과시킨 비율 | 보조 지표 |
-| 도메인 정확도 | in_domain 판정 정확도 | |
-| Slot F1 | 슬롯 추출 정확도 | |
-| **α (에스컬레이션율)** | cloud 라우팅 비율 | 낮을수록 비용 절감 |
-| **인니어 FPR** | 언어별 분해 | **< 5%** |
-| P95 지연 | | **< 600ms** |
+`score.py` 의 콘솔 리포트는 `ko`/`en`/`id`/`ALL` 행만 출력한다. zh·ja 는 집계에는
+들어가지만 표에 별도 행으로 나오지 않는다.
 
-3개 기준 중 2개 이상 충족 시 2주 본 실증 편성 권고.
+### 지표
 
-## 확장
+| 지표 | 의미 |
+|---|---|
+| **FPR** | 정상 문의를 잘못 막은 비율 (1순위) |
+| FNR | 막아야 할 걸 통과시킨 비율 |
+| 도메인 정확도 | `in_domain` 판정 정확도 |
+| 의도 정확도 | 게이트가 고른 도구가 맞았는지 |
+| Slot F1 | 출발·도착·일시·인원 추출 정확도 |
+| **α (에스컬레이션율)** | `cloud` 라우팅 비율. 낮을수록 비용 절감 |
+| P50 / P95 지연 | 게이트 응답 시간 |
 
-90문항은 3일 실증용 최소 규모다. 본 실증으로 넘어가면 다음을 추가한다.
+### 측정 결과 (90문항 기준, `eval/results/`)
 
-- 중국어·일본어 각 40문항
-- 경계 사례를 60문항으로 확대 (실제 트래픽에서 수집)
+```
+지표                zeroshot(8B)      qwen4b         qwen1.7b
+──────────────────────────────────────────────────────────────
+FPR (전체)              1.5%            1.5%            0.0%
+FNR                     0.0%            0.0%            8.0%
+도메인 정확도            98.9%           98.9%           97.8%
+의도 정확도             53.3%           38.9%           17.8%
+Slot F1                 0.754           0.630           0.637
+에스컬레이션 α          54.4%           51.1%           64.4%
+지연 P95                2.335s          1.423s          1.698s
+```
+
+1.7B 의 FPR 0% 는 함정이다 — 정상을 막지 않는 대신 막아야 할 것도 통과시켰다.
+제로샷 도메인 정확도가 98.9% 라 **LoRA 파인튜닝은 불필요하다고 판정**하고
+아키텍처에서 제거했다. 남은 오답은 모델이 아니라 금지어 사전·프롬프트 영역이었다.
+자세한 근거는 [docs/FINDINGS.md](docs/FINDINGS.md).
+
+### 확장 시 추가할 것
+
+- 경계 사례를 실제 트래픽에서 수집해 확대
 - 지명 표기 변형 (仁川空港 / Incheon Airport / Bandara Incheon)
 - 다국어 혼용 발화 ("Incheon 공항까지 얼마나 걸려요")
 - 오탈자·음성인식 오류 시뮬레이션
+- 로마자·한자 역명 매핑 (현재 역명 색인은 한글 전용)
 
-## 주의
+> `toxicity` 문항의 비속어는 우회 탐지 테스트용 최소 샘플이다. 실제 운영 전에
+> **기관 정책에 맞는 블록리스트로 교체**해야 한다.
 
-`toxicity` 문항의 비속어는 우회 탐지 테스트용 최소 샘플이다. 실제 운영 전에
-**기관 정책에 맞는 블록리스트로 교체**하고, `s3://.../blocklist/{lang}.json` 에
-언어별 어휘를 채워 넣어야 한다.
+---
 
-## 배포 (GitHub Actions)
+## CI/CD
 
-> **참고**: 이 저장소에는 배포 방식이 두 가지 있다 — 이 섹션(GitHub Actions +
-> SSM)과 바로 다음 섹션(CodePipeline/CodeBuild/CodeDeploy). 같은 EC2 인스턴스,
-> 같은 `maas-api` 서비스를 대상으로 하므로 **`main` 에 푸시하면 이론상 둘 다
-> 돈다.** 운영 중 하나로 정리하기 전까지는 어느 쪽이 마지막에 이겼는지
-> 헷갈릴 수 있으니 주의. (`.github/workflows/deploy.yml` 을 비활성화하려면
-> 파일을 지우거나 `on:` 트리거를 제거한다.)
+배포 경로는 **CodePipeline 하나**다.
 
-배포 구조: `로컬 → S3(maas-deploy-508139322599/app/) → EC2(/opt/maas) → systemd(maas-api)`.
-vLLM 은 별도 도커 컨테이너(포트 8000)로 이 배포와 무관하며, 배포 과정에서 절대
-재시작되지 않는다.
-
-### 자동 배포
-
-`main` 브랜치에 푸시하면 두 GitHub Actions 워크플로가 순서대로 돈다.
-
-1. **CI** (`.github/workflows/ci.yml`) — push/PR 모두에서 실행. 문법 검사, `gate/*.json`
-   검증, `eval/testset.jsonl` 검증, `gate/`·`ui/` 모듈 import 검사를 한다. 실제 API
-   호출이나 모델 추론은 하지 않는다.
-2. **Deploy** (`.github/workflows/deploy.yml`) — `main` 에서 CI가 성공한 뒤에만
-   `workflow_run` 트리거로 실행. `gate/`, `ui/` 를 S3 에 동기화하고, SSM 으로 EC2 에서
-   `git pull` 대신 `aws s3 sync` + `systemctl restart maas-api` 를 실행한 뒤 헬스체크
-   (`/v1/health`)까지 확인한다.
-
-**EC2 인스턴스가 정지 중이면 배포가 건너뛰어진다.** 교육 계정이라 비용 절감을 위해
-자주 정지해 두는데, 이때 워크플로를 실패(빨간불)로 만들지 않고 "배포 건너뜀"으로
-성공 처리한다 — Actions 탭의 Job Summary 에 사유가 남는다. 인스턴스를 다시 켠 뒤
-`main` 에 빈 커밋이라도 푸시하면 그 시점 코드로 배포된다.
-
-`.github/workflows/` 만 변경된 커밋도 배포를 건너뛴다 (앱 코드가 안 바뀌었으므로).
-
-배포 실패 시 이전 버전으로 **자동 롤백하지 않는다** — S3 버전 관리가 꺼져 있어
-수동 복구가 더 안전하다. 실패하면 Actions 로그에 원인(SSM 명령 오류, 헬스체크
-실패 등)이 남으니 그걸 보고 원인을 고친 뒤 다시 푸시한다.
-
-### 수동 배포 (기존 절차)
-
-```bash
-# 1) S3 동기화
-aws s3 sync gate/ s3://maas-deploy-508139322599/app/gate/ --delete \
-  --exclude "__pycache__/*" --exclude "*.db" --exclude "*.zip"
-aws s3 sync ui/ s3://maas-deploy-508139322599/app/ui/ --delete \
-  --exclude "__pycache__/*"
-
-# 2) EC2 에 SSM 으로 배포 명령 전송
-aws ssm send-command \
-  --instance-ids i-008500ef9e7c53aec \
-  --document-name "AWS-RunShellScript" \
-  --parameters 'commands=[
-    "cd /opt/maas",
-    "aws s3 sync s3://maas-deploy-508139322599/app/ . --delete",
-    "systemctl restart maas-api"
-  ]'
-
-# 3) 확인
-curl -sf http://<EC2 공인 IP>:8080/v1/health
+```
+GitHub(main) → CodePipeline → CodeBuild(maas-build) → CodeDeploy(maas-api) → EC2(/opt/maas) → systemd
 ```
 
-### systemd 환경변수 변경
+`main` 에 푸시하면 CodeStarSourceConnection 이 감지해 파이프라인이 돈다.
 
-`MAAS_API_KEY`, `VLLM_URL`, `GUARDRAIL_ID` 등 API 키·설정값은 EC2 의 systemd 유닛
-파일(`/etc/systemd/system/maas-api.service` 등)에 있다. GitHub Actions 워크플로는
-이 값들을 전혀 다루지 않으므로, 바꾸려면 **EC2 에 직접 접속**해야 한다 (SSM
-Session Manager 권장 — SSH 키 관리 불필요).
-
-```bash
-aws ssm start-session --target i-008500ef9e7c53aec
-sudo systemctl edit maas-api        # 또는 유닛 파일 직접 수정
-sudo systemctl daemon-reload
-sudo systemctl restart maas-api
-```
-
-## 배포 (CodePipeline)
-
-배포 구조: `GitHub(main) → CodePipeline → CodeBuild(검증) → CodeDeploy → EC2(/opt/maas) → systemd(maas-api)`.
-`appspec.yml`(저장소 루트)과 `scripts/deploy/*.sh` 훅, `buildspec.yml` 로 구성된다.
-vLLM 도커 컨테이너(포트 8000)는 이 배포와 무관하며, 훅 스크립트는 `docker` 명령을
-전혀 쓰지 않는다.
-
-### 자동 배포
-
-`main` 에 푸시하면 CodeStarSourceConnection 이 이를 감지해 파이프라인이 돈다.
-
-1. **Source** — GitHub 저장소(`sweeetgy-boop/maas-multilingual-agent`, `main`)를
-   가져온다.
-2. **Build** (CodeBuild 프로젝트 `maas-build`) — 문법 검사, `gate/*.json` 검증,
-   `eval/testset.jsonl` 검증, 배포 구성 파일 존재 확인만 한다. 실제 API 호출이나
-   모델 추론은 하지 않는다(GPU·vLLM 없음). 검증을 통과한 소스를 그대로
-   아티팩트로 넘긴다 — SSM 은 여기서 쓰지 않는다.
-3. **Deploy** (CodeDeploy 애플리케이션 `maas-api` / 배포그룹 `maas-api-prod`) —
-   `appspec.yml` 의 훅을 EC2 위 CodeDeploy 에이전트가 순서대로 실행한다:
+1. **Source** — `sweeetgy-boop/maas-multilingual-agent` (`main`).
+2. **Build** (`buildspec.yml`) — 문법 검사(`py_compile`), `gate/*.json` 검증,
+   `eval/testset.jsonl` 검증, 배포 구성 파일 존재 확인. 실제 API 호출이나 모델
+   추론은 하지 않는다(빌드 환경에 GPU·vLLM 없음). `__pycache__`·`*.db`·`*.zip` 을
+   정리한 뒤 아티팩트를 넘긴다.
+3. **Deploy** (`appspec.yml` + `scripts/deploy/*.sh`) — CodeDeploy 에이전트가
    `ApplicationStop → BeforeInstall → (파일 복사) → AfterInstall → ApplicationStart
-   → ValidateService`. `gate/`, `ui/` 아래 소스만 교체하고, systemd 유닛 파일
-   (`/etc/systemd/system/maas-api.service`, API 키가 들어있는 파일)은 절대
-   덮어쓰지 않는다.
+   → ValidateService` 순으로 훅을 실행한다. `gate/`, `ui/`, `requirements.txt` 만
+   교체하고 **systemd 유닛 파일(API 키가 들어있는 파일)은 절대 덮어쓰지 않는다.**
+   vLLM 도커 컨테이너(포트 8000)도 건드리지 않는다 — 훅 스크립트에 `docker` 명령이
+   없다.
 
-**EC2 인스턴스가 정지 중이면 배포가 실패한다.** CodeDeploy 는 배포그룹의 대상
-인스턴스를 찾지 못하면(태그 `CodeDeployTarget=maas-api` 로 매칭) 그 배포를
-실패로 표시한다 — GitHub Actions 버전과 달리 "건너뜀"으로 조용히 넘어가지
-않는다. 교육 계정 비용 절감을 위해 EC2 를 자주 꺼 두므로, **이 실패는 정상
-동작이다.** 인스턴스를 켠 뒤 CodeDeploy 콘솔에서 마지막 배포를 재시도하거나
-`main` 에 빈 커밋을 푸시해 새 배포를 트리거하면 된다.
+**EC2 인스턴스가 정지 중이면 배포가 실패한다.** CodeDeploy 는 태그
+(`CodeDeployTarget=maas-api`)로 대상 인스턴스를 찾지 못하면 배포를 실패로
+표시한다. 교육 계정 비용 절감을 위해 EC2 를 자주 꺼 두므로 **이 실패는 정상
+동작이다.** 인스턴스를 켠 뒤 콘솔에서 마지막 배포를 재시도하거나 `main` 에 빈
+커밋을 푸시하면 된다.
+
+> GitHub Actions 워크플로(`.github/workflows/*.disabled`)는 같은 EC2·같은 서비스를
+> 대상으로 하는 두 번째 배포 경로였다. 어느 쪽이 마지막에 이겼는지 헷갈리는 문제가
+> 있어 CodePipeline 으로 일원화하고 확장자를 바꿔 비활성화했다. 되살리려면 파일명의
+> `.disabled` 를 떼면 되지만, 그 전에 CodePipeline 을 먼저 끄는 편이 안전하다.
 
 ### 파이프라인 최초 생성 / 갱신
 
@@ -215,13 +312,11 @@ vLLM 도커 컨테이너(포트 8000)는 이 배포와 무관하며, 훅 스크�
 ```
 
 멱등적이다 — `maas-build`/`maas-pipeline` 이 이미 있으면 update, 없으면 create.
-GitHub 연결(CodeConnections)이 처음 만들어진 뒤 **PENDING** 상태라면, 실행 전에
-[콘솔](https://console.aws.amazon.com/codesuite/settings/connections)에서 한
-번 승인해야 한다 — 이건 스크립트로 자동화할 수 없다.
+GitHub 연결(CodeConnections)이 처음 만들어진 뒤 **PENDING** 상태라면 실행 전에
+[콘솔](https://console.aws.amazon.com/codesuite/settings/connections)에서 한 번
+승인해야 한다 — 스크립트로 자동화할 수 없다.
 
 ### 수동 배포
-
-콘솔 또는 CLI 로 기존 배포그룹에 즉시 배포를 트리거할 수 있다.
 
 ```bash
 aws deploy create-deployment \
@@ -230,7 +325,33 @@ aws deploy create-deployment \
   --github-location repository=sweeetgy-boop/maas-multilingual-agent,commitId=<커밋SHA>
 ```
 
-### systemd 환경변수 변경
+### 환경변수·API 키 변경
 
-CodeDeploy 훅도 systemd 유닛 파일을 건드리지 않는다(제약사항). API 키 등은
-GitHub Actions 섹션과 동일하게 **EC2 에 직접 접속**해서 바꿔야 한다.
+CodeDeploy 훅은 systemd 유닛 파일을 건드리지 않는다(의도된 제약). `MAAS_API_KEY`,
+`VLLM_URL`, `GUARDRAIL_ID` 같은 값은 **EC2 에 직접 접속**해서 바꿔야 한다.
+
+```bash
+aws ssm start-session --target i-008500ef9e7c53aec
+sudo systemctl edit maas-api
+sudo systemctl daemon-reload
+sudo systemctl restart maas-api
+```
+
+시작·정지, 인증서 갱신, 장애 진단, 종료 체크리스트는
+[docs/architecture/operations.md](docs/architecture/operations.md).
+
+---
+
+## 알려진 제약
+
+| 제약 | 내용 |
+|---|---|
+| 계정 만료 | 교육 계정(kosa-edu-3), **2026-09-08 만료** — 이후 전체 인프라 소멸 |
+| 항공·숙박 목 데이터 | `search_flight`, `search_lodging` 은 아직 실 API 미연동 |
+| 코레일 미래 데이터 없음 | 실시간·미래 시간표가 아니라 과거 실적 기반 *참고 시간표*다 |
+| 실시간 도시데이터 범위 | 서울 주요 121개 장소 밖은 `location_not_covered` |
+| 도시철도 시각표 없음 | KRIC `subwayTimetable` 미승인. 역·노선·환승만 답한다 |
+| ODsay 미사용 | 키 미설정으로 실측 미검증. 실패 시 폴백 문구로 동작 |
+| Bedrock 모델 제약 | 권한 경계로 Sonnet 계열 차단, **Haiku 만 사용 가능** |
+| datetime 미승계 | 멀티턴에서 origin/destination/pax 는 승계하지만 datetime 은 승계하지 않는다. "그럼 다음 열차는?" 이 직전 시각이 아니라 **질문 시점 기준**으로 계산된다 |
+| 비용 | EC2(g6e.xlarge) 24시간 가동 시 **하루 약 $29** |
