@@ -401,7 +401,8 @@ def search_via_stops(origin: str, destination: str, ref_ymd: str,
 
 
 def search_schedule(origin: str, destination: str, target_date: str | date,
-                    after_hhmm: str | None = None, limit: int = 5) -> dict | None:
+                    after_hhmm: str | None = None, before_hhmm: str | None = None,
+                    limit: int = 5) -> dict | None:
     """요일 매칭 참고 시간표.
 
     이 API 에는 미래 데이터가 없으므로, target_date 와 같은 요일의 가장
@@ -421,8 +422,14 @@ def search_schedule(origin: str, destination: str, target_date: str | date,
 
     운임·열차종별은 API 가 주지 않으므로 필드를 넣지 않는다(지어내지 않는다).
 
+    after_hhmm/before_hhmm 은 출발 시각대 필터("05:00" 형식, 반개구간
+    [after, before)). 게이트가 뽑은 "오늘 오후" 같은 시간대를 호출부가
+    범위로 옮겨 넘긴다. 필터는 limit 로 자르기 **전에** 걸어야 한다 —
+    나중에 거르면 하루의 첫 5편만 받아 놓고 그중에서 고르게 된다.
+
     키 없음·조회 실패·기준일 없음·구간 0건이면 None (호출부가 목 데이터로
-    폴백). 0건을 "운행 없음"으로 단정하지 않는다."""
+    폴백). 시간대 필터 때문에 0건이 된 경우도 None 이라, 호출부가 필터 없이
+    다시 부를지 판단한다. 0건을 "운행 없음"으로 단정하지 않는다."""
     if not KEY:
         return None
 
@@ -444,6 +451,8 @@ def search_schedule(origin: str, destination: str, target_date: str | date,
         if dep is None:
             continue
         if after_hhmm and dep[11:] < after_hhmm:
+            continue
+        if before_hhmm and dep[11:] >= before_hhmm:
             continue
         trains.append({
             "train_no": r["trn_no"],

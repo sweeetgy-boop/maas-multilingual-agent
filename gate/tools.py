@@ -204,6 +204,46 @@ def resolve_place_coords(lat: float, lon: float, name: str | None = None) -> dic
             "lat": lat, "lon": lon, "access_points": find_access_points(lat, lon)}
 
 
+# 자연어 시간대 → 출발 시각 범위 [시작, 끝). 게이트가 뽑은 datetime 슬롯을
+# 시간표 필터로 옮긴다.
+#
+# 순서가 규칙이다: 좁은 표현을 먼저 본다. "이른 아침"·"早朝" 는 "아침"·"朝" 를
+# 품고 있어서 새벽을 뒤에 두면 아침으로 먹힌다. 같은 이유로 "傍晚"(저녁)은
+# "晚上"(밤)보다 앞이다.
+#
+# 겹치는 범위는 그대로 둔다 — 점심(11~14)과 오후(12~18)는 실제로 겹치고,
+# 어느 한쪽으로 잘라내면 경계 시각의 열차가 사라진다.
+_TIME_WINDOWS: list[tuple[tuple[str, ...], tuple[str, str]]] = [
+    (("새벽", "이른 아침", "이른아침", "첫차", "dawn", "early morning", "first train",
+      "凌晨", "早朝", "始発", "subuh", "dini hari"), ("05:00", "08:00")),
+    (("점심", "정오", "낮", "noon", "midday", "lunch",
+      "中午", "正午", "昼", "siang"), ("11:00", "14:00")),
+    (("저녁", "evening", "傍晚", "夕方", "夕刻", "petang"), ("17:00", "21:00")),
+    (("밤", "야간", "막차", "night", "last train",
+      "晚上", "夜", "malam"), ("20:00", "24:00")),
+    (("오후", "afternoon", "sore", "下午", "午後"), ("12:00", "18:00")),
+    (("아침", "오전", "morning", "上午", "早上", "午前", "朝", "pagi"), ("06:00", "12:00")),
+]
+
+
+def time_window(dt_hint: str | None) -> tuple[str, str] | None:
+    """"오늘 오후" → ("12:00", "18:00"). 시간대 표현이 없으면 None.
+
+    None 이면 필터를 걸지 않는다. 현재 시각 이후로 자동으로 좁히지도 않는다 —
+    코레일 데이터는 과거 실적을 옮겨 온 참고 시간표라 "지금 이후"라는 개념이
+    성립하지 않는다(korail_api 참고)."""
+    if not dt_hint:
+        return None
+    h = dt_hint.casefold()
+    for keys, window in _TIME_WINDOWS:
+        if any(k.casefold() in h for k in keys):
+            return window
+    return None
+
+
+_TIME_FILTER_NOTE = "요청하신 시간대에 운행하는 열차가 없어 전체 시간표를 표시합니다"
+
+
 def _base_date(dt_hint: str | None) -> datetime:
     now = datetime.now().replace(second=0, microsecond=0)
     h = (dt_hint or "").casefold()
@@ -330,10 +370,27 @@ def search_rail(origin: str | None, destination: str | None,
     # 존재하지 않는 편명이라, 실제 운행 기록이 참고값으로도 더 낫다.
     o_stn, d_stn = _rail_station_name(o), _rail_station_name(d)
     if o_stn and d_stn:
-        real = korail_api.search_schedule(o_stn, d_stn,
-                                          _base_date(datetime_hint).strftime("%Y%m%d"))
+        ymd = _base_date(datetime_hint).strftime("%Y%m%d")
+        # 게이트가 뽑은 "오늘 오후" 를 출발 시각 범위로 옮겨 넘긴다. 이걸
+        # 넘기지 않아서 오후를 물어도 첫차(05:13)부터 나갔다.
+        window = time_window(datetime_hint)
+        real = korail_api.search_schedule(
+            o_stn, d_stn, ymd,
+            after_hhmm=window[0] if window else None,
+            before_hhmm=window[1] if window else None)
+
+        # 그 시간대에 운행이 없으면 빈손으로 두지 않고 전체 시간표로 되돌리되,
+        # 요청한 시간대가 아니라는 사실을 함께 실어 보낸다. 같은 조회라
+        # _get 캐시에 걸려 추가 호출 비용은 사실상 없다.
+        widened = False
+        if window and not (real and real.get("trains")):
+            real = korail_api.search_schedule(o_stn, d_stn, ymd)
+            widened = bool(real and real.get("trains"))
+
         if real and real.get("found") and real.get("trains"):
             result = _rail_result_from_api(real, o, d, pax)
+            if widened:
+                result["time_filter_note"] = _TIME_FILTER_NOTE
             _add_context(result, d["name"])
             return _stamp(
                 result, "한국철도공사 열차운행정보 (공공데이터포털)",

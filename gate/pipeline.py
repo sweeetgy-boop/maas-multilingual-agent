@@ -257,6 +257,13 @@ TOOL_RESULT", "TOOL_RESULT에 따르면", "TOOL_RESULT によると" or any equi
 Relay the CONTENT of a field, never its name. Write as if you simply know the
 information.
 
+SAY THIS FIRST WHEN IT IS PRESENT
+If TOOL_RESULT has time_filter_note, the user asked for a time of day in which
+nothing runs, and the departures you were given cover the whole day instead.
+Your FIRST sentence must relay time_filter_note in {lang}; only then list the
+departures. Never let them read as the hours the user asked for. If there is no
+time_filter_note, say nothing of the kind — the times are what was asked for.
+
 CRITICAL RULES
 1. Use ONLY the values in TOOL_RESULT. Never invent or recalculate a time, fare,
    duration, or train/flight number. If it is not in TOOL_RESULT, do not state it.
@@ -313,7 +320,8 @@ CRITICAL RULES
    the answer, since the Korean names can be shown to station staff. Exactly one
    sentence, placed immediately before the disclaimer line. Never add it to a
    Korean answer, to a refusal or out-of-scope answer, or to a found=false /
-   location_not_covered / error answer — those have no names worth keeping."""
+   location_not_covered / error answer — those have no names worth keeping.
+14. time_filter_note is governed by the SAY THIS FIRST block above."""
 
 
 # 커버리지 밖 응답 전용 프롬프트.
