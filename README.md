@@ -58,6 +58,92 @@
 
 ---
 
+## API
+
+| 엔드포인트 | 용도 |
+|---|---|
+| `POST /v1/chat` | 대화 (자체 스키마, 모바일 앱·채팅 UI 가 사용) |
+| `POST /v1/chat/completions` | **OpenAI Chat Completions 호환** |
+| `GET /v1/models` | OpenAI 호환 모델 목록 |
+| `POST /v1/evaluate` · `/v1/evaluate/batch` | 단건·배치 평가 (차단 계층 반환) |
+| `GET /v1/health` | 상태 및 구성 (인증 불필요) |
+| `GET /v1/spec` | 방어 계층 정의 |
+| `GET /docs` | OpenAPI 문서 |
+
+인증은 `X-API-Key` 헤더이며, OpenAI 호환 경로는 `Authorization: Bearer <키>` 도
+받는다. 레이트리밋은 IP 당 분당 60회(`MAAS_RATE_PER_MIN`).
+
+### OpenAI 호환 엔드포인트
+
+GuardBench(방어 계층 평가 도구) 연동용으로 추가했다. 부수 효과로 Open WebUI,
+LibreChat, LangChain, OpenAI SDK 가 별도 클라이언트 개발 없이 붙는다.
+기존 `/v1/chat` 은 그대로 두었다 — 앱과 UI 가 그 스키마를 쓰고,
+`blocked_by`·`carried_slots` 처럼 OpenAI 표준에 자리가 없는 값을 돌려줘야 한다.
+
+```python
+from openai import OpenAI
+c = OpenAI(base_url="https://maas-transit.duckdns.org/v1", api_key=KEY)
+r = c.chat.completions.create(
+    model="maas-transit",
+    messages=[{"role": "user", "content": "서울역에서 부산역 KTX 오늘 오후"}])
+print(r.choices[0].message.content, r.choices[0].finish_reason)
+```
+
+**`finish_reason` 이 차단 여부다.**
+
+| 값 | 의미 |
+|---|---|
+| `stop` | 정상 응답. 조회 실패(`요청하신 구간의 정보를 찾지 못했습니다`)도 여기다 |
+| `content_filter` | **방어 계층이 차단** |
+
+답변 텍스트만으로는 차단과 조회 실패를 가릴 수 없다 — 둘 다 멀쩡한 문장이라
+평가 도구가 구분하지 못한다. `finish_reason` 이 판정 근거다.
+
+**`x_maas` 는 비표준 확장이다.** 표준 클라이언트는 무시하고, 평가 도구는 여기서
+계층 정보를 읽는다.
+
+```json
+"x_maas": {"blocked_by": "local_gate", "language": "ko", "answered": false,
+           "carried_slots": ["origin"], "latency_ms": 4210,
+           "session_id": "oai-04498fb7f3b8"}
+```
+
+`blocked_by` 는 위 방어 계층 6종 중 하나이며, 차단되지 않았으면 `null` 이다.
+
+**제약**
+
+| 항목 | 내용 |
+|---|---|
+| 스트리밍 | **미지원.** `stream=true` 는 400. 근거성 검증이 끝나야 최종 응답이 정해지고, 검증 실패 시 재생성하거나 답변을 폐기한다. 토큰 단위로 흘려보내면 검증 전에 환각이 노출돼 방어 계층의 전제가 무너진다 |
+| `system` 메시지 | **무시한다.** 외부에서 Supervisor 프롬프트를 덮어쓰면 방어 계층이 통째로 무력화된다 — 인젝션의 정석 경로다. 무시한 사실은 stderr 로그(`journalctl -u maas-api`)에 남는다 |
+| `usage` | 토큰을 실제로 세지 않아 전부 `0` 이다. 표준 클라이언트가 이 필드를 기대하므로 생략하지 않되, 추정치를 지어내지 않는다 |
+| 응답 지연 | **4~7초.** 배치로 수백 건을 던지면 오래 걸리므로 클라이언트 타임아웃을 넉넉히 잡아야 한다 |
+| 레이트리밋 | 분당 60회. 배치 평가는 이 한도에 걸릴 수 있다 (429 에 `Retry-After` 헤더가 붙는다) |
+| 멀티턴 | OpenAI 는 무상태라 클라이언트가 매번 전체 `messages` 를 보낸다. 마지막 user 메시지 앞부분의 해시를 세션 키로 삼아 슬롯을 잇는다. 이력을 편집하면 새 세션이 된다 |
+
+에러는 OpenAI 형식(`{"error": {"message", "type", "code"}}`)으로 돌려준다.
+기존 엔드포인트는 FastAPI 기본 형식(`{"detail": ...}`)을 그대로 쓴다.
+
+### GuardBench 연결 정보
+
+```
+Base URL : https://maas-transit.duckdns.org/v1
+Model    : maas-transit
+인증     : Authorization: Bearer <MAAS_API_KEY>   (X-API-Key 도 가능)
+차단 판정: finish_reason == "content_filter"
+계층 분석: x_maas.blocked_by
+```
+
+- `stream=true` 를 보내지 말 것 (400).
+- `system` 메시지는 무시되므로 프롬프트 주입 경로로 쓸 수 없다 — 이 경로를
+  시험한다면 그것이 기대 동작이다.
+- 요청당 4~7초. 타임아웃을 최소 30초 이상 잡고, 분당 60회 제한에 맞춰
+  간격을 둔다.
+- 계층별 기여도만 필요하면 `/v1/evaluate/batch` 가 더 낫다 — 한 번에 200건까지
+  받고 계층별 집계를 돌려준다.
+
+---
+
 ## 저장소 구조
 
 ```

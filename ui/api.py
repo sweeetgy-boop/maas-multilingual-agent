@@ -26,6 +26,8 @@ EC2 인스턴스에서 직접 실행하면 vLLM 이 같은 호스트라 터널�
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import secrets
 import sys
@@ -35,7 +37,10 @@ from collections import defaultdict, deque
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "gate"))
@@ -78,15 +83,25 @@ def auth(x_api_key: str = Header(None, alias="X-API-Key")) -> str:
     return x_api_key
 
 
-def rate_limit(request: Request) -> None:
+def _rate_limited(request: Request) -> int | None:
+    """레이트리밋 판정. 초과면 재시도까지 남은 초, 통과면 None(호출을 계상한다).
+
+    기존 rate_limit() 과 OpenAI 호환 경로가 같은 카운터를 봐야 하므로 여기
+    한 곳에만 둔다 — 두 벌로 두면 한쪽만 고쳐져 제한이 어긋난다."""
     ip = request.client.host if request.client else "unknown"
     now = time.time()
     q = _hits[ip]
     while q and now - q[0] > 60:
         q.popleft()
     if len(q) >= RATE_PER_MIN:
-        raise HTTPException(429, f"분당 {RATE_PER_MIN}회 제한을 초과했습니다")
+        return max(1, int(60 - (now - q[0])) + 1)
     q.append(now)
+    return None
+
+
+def rate_limit(request: Request) -> None:
+    if _rate_limited(request) is not None:
+        raise HTTPException(429, f"분당 {RATE_PER_MIN}회 제한을 초과했습니다")
 
 
 GUARD = [Depends(auth), Depends(rate_limit)]
@@ -361,6 +376,273 @@ def spec() -> dict:
             "not_supported": ["예약·결제·취소", "관광 일정", "맛집 추천",
                               "날씨", "환전", "의료·법률·투자 자문"],
         },
+    }
+
+
+# ─────────────────────────────────────────────────────────
+# OpenAI Chat Completions 호환 계층 (GuardBench 연동용)
+#
+# GuardBench 는 OpenAI 형식으로 질문을 던지고 답변을 받아 차단 여부를
+# 평가한다. 기존 /v1/chat 은 그대로 둔다 — 모바일 앱과 채팅 UI 가 그
+# 스키마를 쓰고, blocked_by·carried_slots 처럼 OpenAI 표준에 자리가 없는
+# 값을 돌려줘야 한다. 여기서는 같은 run()·classify() 를 재사용해 형식만
+# 바꾼다.
+#
+# 별도 파일로 빼지 않는 이유: 예전에 ui/api.py 와 ui/server.py 에 같은 슬롯
+# 로직이 중복돼 한쪽에만 버그가 남았던 적이 있다. 세션·판정 로직을 한 벌로
+# 둔다.
+OPENAI_MODEL = "maas-transit"
+_OPENAI_PATHS = ("/v1/chat/completions", "/v1/models")
+
+
+class OpenAIError(HTTPException):
+    """OpenAI 에러 엔벨로프로 직렬화되는 예외. 기존 엔드포인트는 FastAPI
+    기본 {"detail": ...} 형식을 그대로 쓴다 — 이 클래스는 OpenAI 경로에서만
+    쓴다."""
+
+    def __init__(self, status_code: int, message: str, code: str,
+                 err_type: str = "invalid_request_error",
+                 headers: dict | None = None) -> None:
+        super().__init__(status_code, message, headers=headers)
+        self.code = code
+        self.err_type = err_type
+
+
+@app.exception_handler(OpenAIError)
+async def _openai_error_handler(_: Request, exc: OpenAIError) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": {"message": exc.detail, "type": exc.err_type,
+                           "code": exc.code}},
+        headers=exc.headers)
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error_handler(request: Request,
+                                    exc: RequestValidationError):
+    """본문 형식 오류를 OpenAI 경로에서만 OpenAI 형식으로 바꾼다.
+    나머지 경로는 FastAPI 기본 처리(422)를 그대로 위임한다."""
+    if request.url.path.rstrip("/") in _OPENAI_PATHS:
+        first = exc.errors()[0] if exc.errors() else {}
+        where = ".".join(str(x) for x in first.get("loc", ()))
+        return JSONResponse(
+            status_code=400,
+            content={"error": {
+                "message": f"{where}: {first.get('msg', '잘못된 요청 본문입니다')}",
+                "type": "invalid_request_error", "code": "invalid_request"}})
+    return await request_validation_exception_handler(request, exc)
+
+
+def auth_openai(x_api_key: str = Header(None, alias="X-API-Key"),
+                authorization: str = Header(None)) -> str:
+    """X-API-Key 와 OpenAI 표준 Authorization: Bearer 를 모두 받는다.
+    OpenAI SDK 는 Bearer 만 보낸다. 기존 auth() 는 건드리지 않는다."""
+    if not API_KEY:
+        raise OpenAIError(503, "서버에 MAAS_API_KEY 가 설정되지 않았습니다",
+                          "server_not_configured", "server_error")
+    token = x_api_key
+    if not token and authorization:
+        scheme, _, value = authorization.partition(" ")
+        if scheme.lower() == "bearer":
+            token = value.strip()
+    if not token or not secrets.compare_digest(token, API_KEY):
+        raise OpenAIError(401, "유효하지 않은 API 키입니다",
+                          "invalid_api_key", "authentication_error")
+    return token
+
+
+def rate_limit_openai(request: Request) -> None:
+    retry = _rate_limited(request)
+    if retry is not None:
+        raise OpenAIError(429, f"분당 {RATE_PER_MIN}회 제한을 초과했습니다",
+                          "rate_limit_exceeded", "rate_limit_error",
+                          headers={"Retry-After": str(retry)})
+
+
+OPENAI_GUARD = [Depends(auth_openai), Depends(rate_limit_openai)]
+
+
+class OAIMessage(BaseModel):
+    role: str
+    content: str | None = None
+
+
+class ChatCompletionReq(BaseModel):
+    # 실제 모델은 하나뿐이라 값은 검증하지 않고 그대로 되돌려준다.
+    model: str = OPENAI_MODEL
+    messages: list[OAIMessage]
+    stream: bool = False
+    # temperature·max_tokens 등 나머지 OpenAI 파라미터는 무시한다
+    # (pydantic 기본 동작이 미선언 필드를 버린다).
+
+
+def _session_key(msgs: list[dict]) -> str:
+    raw = json.dumps(msgs, sort_keys=True, ensure_ascii=False)
+    return "oai-" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def openai_to_internal(body: ChatCompletionReq) -> tuple[str, str | None, list[dict]]:
+    """OpenAI 요청 → (본문, 세션키, 직전 대화). 형식 오류는 OpenAIError."""
+    if body.stream:
+        # 우리 파이프라인은 Supervisor 응답을 받은 뒤 근거성 검증을 거쳐야
+        # 최종 응답이 정해진다. 검증에 실패하면 재생성하고, 그래도 실패하면
+        # 답변을 폐기한다. 토큰 단위로 흘려보내면 검증 전에 환각이 노출돼
+        # 방어 계층의 전제가 무너진다.
+        raise OpenAIError(400, "streaming is not supported; set stream=false",
+                          "streaming_not_supported")
+
+    msgs = [{"role": m.role, "content": m.content or ""} for m in body.messages]
+
+    # system 메시지는 버린다. 우리 Supervisor 프롬프트를 외부에서 덮어쓰게
+    # 하면 방어 계층이 통째로 무력화된다 — 인젝션의 정석 경로다.
+    dropped = [m for m in msgs if m["role"] == "system"]
+    if dropped:
+        print(f"[openai] system 메시지 {len(dropped)}건 무시 "
+              f"(첫 80자: {dropped[0]['content'][:80]!r})", file=sys.stderr)
+
+    idx = next((i for i in range(len(msgs) - 1, -1, -1)
+                if msgs[i]["role"] == "user"), None)
+    if idx is None:
+        raise OpenAIError(400, "messages 에 role=user 메시지가 없습니다",
+                          "no_user_message")
+
+    text = msgs[idx]["content"]
+    if not text.strip():
+        raise OpenAIError(400, "마지막 user 메시지가 비어 있습니다",
+                          "empty_message")
+    if len(text) > MAX_TEXT_LEN:
+        raise OpenAIError(400, f"메시지가 {MAX_TEXT_LEN}자를 넘습니다",
+                          "string_above_max_length")
+
+    # 마지막 user 메시지 앞부분이 세션 키가 된다. 첫 턴이면 None(새 세션).
+    prior = [m for m in msgs[:idx] if m["role"] in ("user", "assistant")]
+    return text, (_session_key(prior) if prior else None), prior
+
+
+def internal_to_openai(r: dict, sid: str, carried: list[str],
+                       model: str) -> dict:
+    """파이프라인 결과 → OpenAI Chat Completion 응답."""
+    blocked, layer = classify(r["route"], r.get("reason", "") or "")
+    return {
+        "id": f"chatcmpl-{uuid.uuid4().hex[:24]}",
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": model,
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": r["answer"]},
+            # 답변 텍스트만으로는 차단과 조회 실패를 가릴 수 없다 — 둘 다
+            # 멀쩡한 문장이다. finish_reason 이 판정 근거가 된다.
+            "finish_reason": "content_filter" if blocked else "stop",
+        }],
+        # 토큰을 실제로 세지 않는다. 표준 클라이언트가 이 필드를 기대하므로
+        # 생략하지 않되, 추정치를 지어내지 않고 0 으로 둔다.
+        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        # 비표준 확장. 표준 클라이언트는 무시하고, GuardBench 는 여기서
+        # 계층 정보를 읽는다.
+        "x_maas": {
+            "blocked_by": layer if blocked else None,
+            "language": r["lang"],
+            "answered": r["route"] == "answered",
+            "carried_slots": carried,
+            "latency_ms": r["total_ms"],
+            "session_id": sid,
+        },
+    }
+
+
+def _canonical_sid(sid: str) -> str:
+    """대화를 가리키는 안정적인 식별자.
+
+    OpenAI 경로의 세션 키는 직전 대화의 해시라서 턴마다 바뀐다. 그대로
+    노출하면 클라이언트가 같은 대화를 이어가는데도 session_id 가 매번 달라
+    보인다. 그래서 세션을 처음 만든 내부 id 를 세션 딕셔너리에 새겨 두고
+    이후 턴에서도 그것을 돌려준다 — 키가 여럿이어도 세션 객체는 하나라서
+    (_link_next_turn 이 복사가 아니라 공유한다) 값이 따라온다.
+
+    기존 /v1/chat 은 run() 이 준 sid 를 그대로 쓰므로 영향이 없다."""
+    sess = _sessions.get(sid)
+    if sess is None:
+        return sid
+    return sess.setdefault("conversation_id", sid)
+
+
+def _link_next_turn(prior: list[dict], user_text: str, answer: str,
+                    sid: str) -> None:
+    """다음 요청이 제시할 세션 키에 이번 세션을 미리 걸어 둔다.
+
+    OpenAI 는 무상태라 클라이언트가 매번 전체 messages 를 보낸다. 우리는
+    session_id 로 슬롯을 보관하므로 대화를 잇는 키가 필요하다.
+
+    키는 "마지막 user 메시지를 뺀 앞부분"의 해시인데, 이 값은 턴이 넘어갈
+    때마다 달라진다(턴2 는 [u1,a1], 턴3 은 [u1,a1,u2,a2]). 그래서 응답을
+    만든 직후 다음 턴이 제시할 해시를 미리 계산해, 같은 세션 딕셔너리를 그
+    키에도 걸어 둔다. 클라이언트가 우리 답변을 그대로 되돌려 보내면 슬롯이
+    이어지고, 이력을 편집하면 해시가 어긋나 새 세션이 된다 — 편집된 이력은
+    다른 대화로 보는 것이 맞다.
+
+    복사가 아니라 같은 객체를 공유하므로 이후 턴의 슬롯 갱신이 양쪽에 함께
+    반영된다. 키가 턴마다 하나씩 늘지만 _gc_sessions 의 TTL 로 정리된다.
+    """
+    sess = _sessions.get(sid)
+    if sess is None:
+        return
+    nxt = _session_key(prior + [{"role": "user", "content": user_text},
+                                {"role": "assistant", "content": answer}])
+    _sessions[nxt] = sess
+
+
+@app.post("/v1/chat/completions", dependencies=OPENAI_GUARD,
+          summary="OpenAI 호환 대화", tags=["openai"])
+def chat_completions(body: ChatCompletionReq) -> dict:
+    """OpenAI Chat Completions 호환 엔드포인트.
+
+    인증은 `Authorization: Bearer <키>` 또는 `X-API-Key` 둘 다 받는다.
+
+    - `stream=true` 는 지원하지 않는다(400). 근거성 검증이 끝나야 최종
+      응답이 정해지므로, 토큰을 흘려보내면 검증 전에 환각이 노출된다.
+    - `system` 메시지는 무시한다. 외부에서 Supervisor 프롬프트를 덮어쓰면
+      방어 계층이 무력화된다.
+    - 차단되면 `finish_reason="content_filter"`, 정상이면 `"stop"` 이다.
+    - `x_maas.blocked_by` 에 담당 방어 계층이 담긴다(비표준 확장).
+    - 응답까지 보통 4~7초 걸린다. 배치 호출은 타임아웃을 넉넉히 잡는다.
+    """
+    text, session_key, prior = openai_to_internal(body)
+    try:
+        r, sid, carried = run(text, session_key)
+    except Exception as e:
+        raise OpenAIError(502, f"파이프라인 오류: {str(e)[:150]}",
+                          "upstream_error", "server_error")
+    out = internal_to_openai(r, _canonical_sid(sid), carried,
+                             body.model or OPENAI_MODEL)
+    _link_next_turn(prior, text, r["answer"], sid)
+    return out
+
+
+@app.get("/v1/models", dependencies=OPENAI_GUARD,
+         summary="모델 목록 (OpenAI 호환)", tags=["openai"])
+def list_models() -> dict:
+    """OpenAI 호환 모델 목록. 실제 모델은 `maas-transit` 하나뿐이다."""
+    return {
+        "object": "list",
+        "data": [{
+            "id": OPENAI_MODEL,
+            "object": "model",
+            "created": 0,
+            "owned_by": "maas",
+            "x_maas": {
+                "streaming": False,
+                "streaming_note": (
+                    "근거성 검증이 끝나야 최종 응답이 정해진다. 토큰 단위로 "
+                    "흘려보내면 검증 전에 환각이 노출되므로 stream=true 는 "
+                    "400 으로 거부한다."),
+                "system_messages": "ignored (Supervisor 프롬프트 보호)",
+                "blocked_signal": "finish_reason == 'content_filter'",
+                "languages": list(pipeline.LANGS),
+                "typical_latency_ms": "4000-7000",
+                "rate_limit_per_min": RATE_PER_MIN,
+            },
+        }],
     }
 
 

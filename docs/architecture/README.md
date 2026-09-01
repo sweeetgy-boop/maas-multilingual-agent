@@ -125,6 +125,14 @@
 | 채팅 UI | `https://maas-ui.duckdns.org` |
 | API 헬스체크 | `GET /v1/health` (인증 불필요) |
 | API 문서(OpenAPI) | `GET /docs` |
+| OpenAI 호환 | `POST /v1/chat/completions`, `GET /v1/models` |
+
+OpenAI 호환 경로는 GuardBench 연동용이다. 인증은 `Authorization: Bearer` 와
+`X-API-Key` 둘 다 받고, 차단 여부는 `finish_reason == "content_filter"` 로,
+담당 계층은 `x_maas.blocked_by` 로 나간다. 스트리밍은 지원하지 않는다
+(근거성 검증이 끝나야 최종 응답이 정해지므로 토큰을 흘려보낼 수 없다).
+`system` 메시지는 Supervisor 프롬프트 보호를 위해 무시한다.
+자세한 내용은 [../../README.md](../../README.md#openai-호환-엔드포인트).
 
 ## 알려진 제약
 
