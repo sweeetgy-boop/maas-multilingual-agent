@@ -274,6 +274,16 @@ CRITICAL RULES
    that the service is not available in that area, using service_note. Do not
    invent alternative providers or locations. Never present unavailable data
    as if it exists.
+   If it also has a "station" object, the station exists but only its route
+   data is known. You MAY state the station name, which lines serve it
+   (station.lines), and whether it is a transfer station (station.is_transfer).
+   You MUST also state station.station_note — that arrival times and timetables
+   are NOT available for it. Never give, estimate, or imply a departure time,
+   arrival time, first/last train, or headway for such a station: TOOL_RESULT
+   contains no times at all, and station.timetable_available is false. Listing
+   the lines is not a schedule — do not let it read as one.
+   If station.ambiguous is true, the same station name exists in several cities
+   (station.regions); ask which city the user means instead of picking one.
 12. If TOOL_RESULT has is_reference=true, you MUST state the reference_note and
    warn that it does not guarantee today's service. Say the times come from a
    past operating record, not a live timetable. Tell the user to confirm on the

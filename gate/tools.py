@@ -19,6 +19,7 @@ import citydata_api
 import expbus_api
 import korail_api
 import odsay_api
+import subway_stations
 from geocode import geocode
 from transit_nodes import NODE_BY_ID, find_access_points
 
@@ -39,6 +40,42 @@ def _not_covered(requested: str | None, service: str) -> dict:
     return {"found": False, "reason": "location_not_covered",
             "requested": requested, "covered_area": COVERED_AREA_LABEL,
             "service_note": SERVICE_NOTE[service]}
+
+
+def _subway_not_covered(requested: str | None) -> dict:
+    """121장소 밖 지하철 질의. 실시간 도착정보는 여전히 줄 수 없지만, 역이
+    실재하는지·어느 노선인지·환승역인지까지는 KRIC 노선 캐시로 답한다.
+
+    반환 스키마는 _not_covered 그대로 두고(found=false, reason=
+    location_not_covered) station 키만 얹는다. found 를 true 로 바꾸면
+    Supervisor 가 조회 성공으로 읽어 "도착정보를 찾았다"처럼 답하게 된다 —
+    바로 그것을 막으려는 분기이므로 found 는 false 로 유지한다.
+
+    **시각 정보는 넣지 않는다.** KRIC subwayTimetable 오퍼레이션이 현재
+    인증키에 승인돼 있지 않아 캐시에 시각이 없다(2026-09-01 실측). 노선을
+    알려준다고 해서 시간표를 주는 것처럼 보이면 안 된다."""
+    base = _not_covered(requested, "get_realtime_status")
+
+    hit = subway_stations.find_station(requested)
+    if not hit:
+        return base
+
+    base["station"] = {
+        "name": hit["name"],
+        "regions": hit["region_names"],
+        "lines": [{"operator": l["operator_name"], "line": l["line_name"]}
+                  for l in hit["lines"]],
+        "is_transfer": hit["is_transfer"],
+        # 도시 단서가 없어 같은 역명이 여러 도시에 걸린 경우(예: "시청"은
+        # 서울·부산·대전에 있다). 호출부가 어느 도시인지 되물어야 한다.
+        "ambiguous": hit["ambiguous"],
+        # 이 키가 있는 한 시각표는 없다. Supervisor 규칙 11 이 이 문구를
+        # 반드시 함께 전달한다.
+        "timetable_available": False,
+        "station_note": ("노선·환승 정보만 제공됩니다. 실시간 도착정보와 "
+                         "운행 시각표는 제공 범위 밖입니다."),
+    }
+    return base
 
 # ── 지명 정규화 사전 (다국어 별칭 → 표준 ID) ──
 # 실제로는 임베딩 + FAISS 로 처리하지만, PoC 는 사전으로 충분하다.
@@ -547,6 +584,29 @@ def get_realtime_status(origin=None, destination=None, pax=None, carried=(), **_
         station = _rail_station_name(resolve_place(anchor))
         # "경부선" 처럼 역이 아니라 노선을 가리킨 경우도 철도 질의다.
         line = None if station else _rail_line_name(anchor)
+
+        # 도시 별칭 때문에 지하철 질의가 간선철도로 새는 것을 막는다.
+        # "부산 서면역"은 PLACE_ALIASES 의 "부산"에 걸려 부산역(간선철도)으로
+        # 해소되고, 코레일 키가 없으면 목 데이터까지 나가 버린다 — 부산 지하철을
+        # 물었는데 경부선 목 데이터가 답이 되는 셈이다.
+        #
+        # 판정은 **양쪽이 질의의 어느 토큰에 맞았는지**를 견줘서 한다. 도시명만
+        # 보고 가릴 수는 없다 — "대구"는 PLACE_ALIASES 에서 동대구역으로,
+        # "광주"는 광주송정역으로 해소돼 도시명 검사를 그냥 빠져나간다.
+        #
+        #   "부산 서면역"  지하철 "서면"  vs 철도 "부산"      → 다르다  → 지하철
+        #   "대구 반월당역" 지하철 "반월당" vs 철도 "동대구"    → 다르다  → 지하철
+        #   "동대구역"     지하철 "동대구" vs 철도 "동대구"    → 같다    → 철도
+        #   "서울역"       지하철 "서울"   vs 철도 "서울"      → 같다    → 철도
+        #   "부산역"       지하철이 도시명 토큰으로만 걸림       → 철도
+        #
+        # 즉 철도 쪽이 제 이름으로 맞은 경우에만 철도로 남고, 도시 별칭을 타고
+        # 엉뚱한 역으로 번진 경우에는 지하철 질의로 본다.
+        sub = subway_stations.find_station(anchor)
+        if (sub and not sub["matched_city_token"]
+                and sub["matched_name"] != subway_stations.normalize(station or "")):
+            return _subway_not_covered(anchor)
+
         if station or line:
             rail = _rail_delay_status(station=station, line=line)
             if rail:
@@ -556,7 +616,7 @@ def get_realtime_status(origin=None, destination=None, pax=None, carried=(), **_
             # 다른 점이다).
             return _stamp({"found": True, "lines": [dict(x) for x in _RAIL_MOCK_LINES]},
                           "GTFS-RT (mock)")
-        return _not_covered(anchor, "get_realtime_status")
+        return _subway_not_covered(anchor)
 
     # 지명 없이 일반적인 지연 여부를 물은 경우("1호선 지금 지연돼?").
     # 여기서 코레일 간선 실적을 주면 안 된다 — 지하철 1호선을 물었는데
