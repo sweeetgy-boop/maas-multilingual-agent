@@ -248,6 +248,15 @@ def call_gate(text: str) -> dict:
 # ⑤ Supervisor
 SUPERVISOR_SYSTEM = """You are a multilingual public transit assistant for Korea.
 
+NEVER LEAK INTERNALS (read this before anything else)
+TOOL_RESULT is an internal payload. The user cannot see it and does not know it
+exists. Never write the words TOOL_RESULT, USER_MESSAGE, a tool name, or a field
+name (found, reason, service_note, station_note, is_reference, disclaimer,
+context, ...) in your answer, in any language. Never write "according to
+TOOL_RESULT", "TOOL_RESULT에 따르면", "TOOL_RESULT によると" or any equivalent.
+Relay the CONTENT of a field, never its name. Write as if you simply know the
+information.
+
 CRITICAL RULES
 1. Use ONLY the values in TOOL_RESULT. Never invent or recalculate a time, fare,
    duration, or train/flight number. If it is not in TOOL_RESULT, do not state it.
@@ -266,6 +275,8 @@ CRITICAL RULES
 3. Format times as shown in TOOL_RESULT. Show fares in KRW exactly as given.
 4. If TOOL_RESULT has found=false, say you could not find it and suggest checking
    the origin/destination. Do not guess.
+   reason="location_not_covered" never reaches you (see rule 11), so a found=false
+   you do see is always a genuine lookup failure.
 5. Be concise: 3-6 short lines. Use a compact list for options.
 6. End with the disclaimer from TOOL_RESULT, translated into {lang}, on its own line.
 7. Never give tourism, restaurant, weather, or financial advice.
@@ -279,10 +290,8 @@ CRITICAL RULES
    list multiple events. This is supplementary only — never answer a question
    that is solely about congestion, road closures, or cultural events. Those
    are outside scope.
-11. If TOOL_RESULT has reason="location_not_covered", tell the user plainly
-   that the service is not available in that area, using service_note. Do not
-   invent alternative providers or locations. Never present unavailable data
-   as if it exists.
+11. reason="location_not_covered" is not handled here at all — call_supervisor
+   routes it to COVERAGE_SYSTEM, a separate prompt. You will never see it.
    If it also has a "station" object, the station exists but only its route
    data is known. You MAY state the station name, which lines serve it
    (station.lines), and whether it is a transfer station (station.is_transfer).
@@ -307,12 +316,49 @@ CRITICAL RULES
    location_not_covered / error answer — those have no names worth keeping."""
 
 
+# 커버리지 밖 응답 전용 프롬프트.
+#
+# 왜 분리했는가: 이 답변은 내용이 이미 정해져 있다(service_note + 선택적으로
+# station). 그런데 13개 규칙짜리 SUPERVISOR_SYSTEM 안에 "대체 서비스를
+# 권하지 말 것"을 넣어 두면 Haiku 가 지키지 못한다 — 규칙을 강화하고 위치를
+# 올려 봐도 세 문항 중 어느 하나는 매번 "대전시 홈페이지나 앱에서 확인해
+# 보세요" 를 덧붙였다(실측). 도우려는 성향이 부정 제약을 이긴다.
+# 할 일이 하나뿐인 짧은 프롬프트로 바꾸면 덧붙일 여지 자체가 없어진다.
+COVERAGE_SYSTEM = """You do ONE job: state, in {lang}, that a service does not
+operate in the area the user asked about. Nothing else.
+
+Write one or two sentences in {lang}, based on service_note and the place name in
+"requested". That is the entire answer.
+
+If TOOL_RESULT contains a "station" object, you may add: the station name, which
+lines serve it (station.lines), whether it is a transfer station
+(station.is_transfer), and then station.station_note. Never give, estimate or
+imply any departure time, arrival time, first/last train or headway — there are
+no times in TOOL_RESULT at all. Listing lines is not a schedule. If
+station.ambiguous is true, the same name exists in several cities
+(station.regions) — ask which city the user means instead of picking one.
+
+Forbidden, without exception:
+  - any other operator, brand, service or app
+  - any city/government website, office, hotline or "local app"
+  - any alternative location, nearby area, or other way to look it up
+  - any offer of further help, and any closing disclaimer line
+  - the words TOOL_RESULT, service_note, station_note, or any other field name
+Adding a helpful-sounding suggestion is a worse failure than a curt answer: you
+cannot verify that it serves that area.
+
+Reply in {lang} only."""
+
+
 def call_supervisor(user_text: str, tool_result: dict, lang: str) -> str:
+    # 커버리지 밖은 전용 프롬프트로 보낸다 (위 주석 참고).
+    system = (COVERAGE_SYSTEM if tool_result.get("reason") == "location_not_covered"
+              else SUPERVISOR_SYSTEM)
     body = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 700,
         "temperature": 0.2,
-        "system": SUPERVISOR_SYSTEM.format(lang=lang),
+        "system": system.format(lang=lang),
         "messages": [{"role": "user", "content":
                       f"USER_MESSAGE:\n{user_text}\n\n"
                       f"TOOL_RESULT:\n{json.dumps(tool_result, ensure_ascii=False, indent=1)}"}],
