@@ -9,7 +9,7 @@
 
 | 용도 | 주소 |
 |---|---|
-| API | `https://maas-transit.duckdns.org` (`X-API-Key` 필요) |
+| API | `https://maas-transit.duckdns.org` (`X-API-Key` 필요, OpenAI 호환 경로는 무인증) |
 | 채팅 UI | `https://maas-ui.duckdns.org` |
 | 헬스체크 | `GET /v1/health` (인증 불필요) |
 | OpenAPI 문서 | `GET /docs` |
@@ -63,15 +63,23 @@
 | 엔드포인트 | 용도 |
 |---|---|
 | `POST /v1/chat` | 대화 (자체 스키마, 모바일 앱·채팅 UI 가 사용) |
-| `POST /v1/chat/completions` | **OpenAI Chat Completions 호환** |
-| `GET /v1/models` | OpenAI 호환 모델 목록 |
+| `POST /v1/chat/completions` | **OpenAI Chat Completions 호환** (인증 불필요) |
+| `GET /v1/models` | OpenAI 호환 모델 목록 (인증 불필요) |
 | `POST /v1/evaluate` · `/v1/evaluate/batch` | 단건·배치 평가 (차단 계층 반환) |
 | `GET /v1/health` | 상태 및 구성 (인증 불필요) |
 | `GET /v1/spec` | 방어 계층 정의 |
 | `GET /docs` | OpenAPI 문서 |
 
-인증은 `X-API-Key` 헤더이며, OpenAI 호환 경로는 `Authorization: Bearer <키>` 도
-받는다. 레이트리밋은 IP 당 분당 60회(`MAAS_RATE_PER_MIN`).
+인증은 `X-API-Key` 헤더다. 레이트리밋은 IP 당 분당 60회(`MAAS_RATE_PER_MIN`).
+
+> **`/v1/chat/completions` 와 `/v1/models` 는 인증이 없다.**
+> GuardBench 연동을 위한 것이다 — 등록 화면에 Endpoint URL 과 Model 칸만 있고
+> API 키나 `Authorization` 헤더를 넣을 자리가 없다.
+> 이 두 경로는 **공개 인터넷에 무인증으로 열려 있으며**, 남용을 막는 것은
+> **IP 당 분당 레이트리밋 하나뿐**이다. `Authorization` 이나 `X-API-Key` 를
+> 보내도 무시하며, 있다고 오류를 내지는 않는다.
+> 나머지 경로(`/v1/chat`, `/v1/evaluate`, `/v1/evaluate/batch`)는 그대로
+> 인증이 필요하다.
 
 ### OpenAI 호환 엔드포인트
 
@@ -82,7 +90,8 @@ LibreChat, LangChain, OpenAI SDK 가 별도 클라이언트 개발 없이 붙는
 
 ```python
 from openai import OpenAI
-c = OpenAI(base_url="https://maas-transit.duckdns.org/v1", api_key=KEY)
+# 인증이 없다. OpenAI SDK 는 api_key 인자를 요구하므로 아무 값이나 넣는다(무시된다).
+c = OpenAI(base_url="https://maas-transit.duckdns.org/v1", api_key="unused")
 r = c.chat.completions.create(
     model="maas-transit",
     messages=[{"role": "user", "content": "서울역에서 부산역 KTX 오늘 오후"}])
@@ -118,7 +127,8 @@ print(r.choices[0].message.content, r.choices[0].finish_reason)
 | `system` 메시지 | **무시한다.** 외부에서 Supervisor 프롬프트를 덮어쓰면 방어 계층이 통째로 무력화된다 — 인젝션의 정석 경로다. 무시한 사실은 stderr 로그(`journalctl -u maas-api`)에 남는다 |
 | `usage` | 토큰을 실제로 세지 않아 전부 `0` 이다. 표준 클라이언트가 이 필드를 기대하므로 생략하지 않되, 추정치를 지어내지 않는다 |
 | 응답 지연 | **4~7초.** 배치로 수백 건을 던지면 오래 걸리므로 클라이언트 타임아웃을 넉넉히 잡아야 한다 |
-| 레이트리밋 | 분당 60회. 배치 평가는 이 한도에 걸릴 수 있다 (429 에 `Retry-After` 헤더가 붙는다) |
+| 인증 | **없다.** GuardBench 연동을 위해 열어 둔 경로다. 보낸 `Authorization`·`X-API-Key` 는 무시하고, 있다고 거부하지 않는다 |
+| 레이트리밋 | 분당 60회. **무인증 경로의 유일한 남용 방어선이다.** 배치 평가는 이 한도에 걸릴 수 있다 (429 에 `Retry-After` 헤더가 붙는다) |
 | 멀티턴 | OpenAI 는 무상태라 클라이언트가 매번 전체 `messages` 를 보낸다. 마지막 user 메시지 앞부분의 해시를 세션 키로 삼아 슬롯을 잇는다. 이력을 편집하면 새 세션이 된다 |
 
 에러는 OpenAI 형식(`{"error": {"message", "type", "code"}}`)으로 돌려준다.
@@ -129,7 +139,7 @@ print(r.choices[0].message.content, r.choices[0].finish_reason)
 ```
 Base URL : https://maas-transit.duckdns.org/v1
 Model    : maas-transit
-인증     : Authorization: Bearer <MAAS_API_KEY>   (X-API-Key 도 가능)
+인증     : 없음 (API Key 칸을 비워 둔다)
 차단 판정: finish_reason == "content_filter"
 계층 분석: x_maas.blocked_by
 ```

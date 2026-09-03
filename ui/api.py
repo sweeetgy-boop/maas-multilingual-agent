@@ -11,10 +11,16 @@ EC2 인스턴스에서 직접 실행하면 vLLM 이 같은 호스트라 터널�
   POST /v1/evaluate/batch    배치 평가 — 계층별 기여도 집계
   GET  /v1/health            상태 및 구성
   GET  /v1/spec              방어 계층 정의
+  POST /v1/chat/completions  OpenAI 호환 대화 (무인증)
+  GET  /v1/models            OpenAI 호환 모델 목록 (무인증)
   GET  /docs                 OpenAPI 문서
 
 인증
   X-API-Key 헤더 필수. MAAS_API_KEY 환경변수로 설정한다.
+
+  단, OpenAI 호환 경로(/v1/chat/completions, /v1/models)는 인증이 없다.
+  GuardBench 가 키를 넣을 자리 없이 호출하기 때문이며, 이 두 경로는 공개
+  인터넷에 열려 있고 분당 레이트리밋만 적용된다.
 
 실행
   export MAAS_API_KEY=$(openssl rand -hex 24)
@@ -61,7 +67,9 @@ app = FastAPI(
         "5개 언어(ko/en/zh/ja/id)로 제공하는 에이전트.\n\n"
         "**방어 계층 6종**을 통과한 응답만 반환하며, 각 요청이 어느 계층에서 "
         "차단됐는지 `layer` 필드로 확인할 수 있다.\n\n"
-        "인증: 모든 요청에 `X-API-Key` 헤더가 필요하다."
+        "인증: `X-API-Key` 헤더가 필요하다. 단 OpenAI 호환 경로"
+        "(`/v1/chat/completions`, `/v1/models`)는 인증 없이 호출할 수 있다 "
+        "— 분당 레이트리밋만 적용된다."
     ),
 )
 
@@ -433,24 +441,6 @@ async def _validation_error_handler(request: Request,
     return await request_validation_exception_handler(request, exc)
 
 
-def auth_openai(x_api_key: str = Header(None, alias="X-API-Key"),
-                authorization: str = Header(None)) -> str:
-    """X-API-Key 와 OpenAI 표준 Authorization: Bearer 를 모두 받는다.
-    OpenAI SDK 는 Bearer 만 보낸다. 기존 auth() 는 건드리지 않는다."""
-    if not API_KEY:
-        raise OpenAIError(503, "서버에 MAAS_API_KEY 가 설정되지 않았습니다",
-                          "server_not_configured", "server_error")
-    token = x_api_key
-    if not token and authorization:
-        scheme, _, value = authorization.partition(" ")
-        if scheme.lower() == "bearer":
-            token = value.strip()
-    if not token or not secrets.compare_digest(token, API_KEY):
-        raise OpenAIError(401, "유효하지 않은 API 키입니다",
-                          "invalid_api_key", "authentication_error")
-    return token
-
-
 def rate_limit_openai(request: Request) -> None:
     retry = _rate_limited(request)
     if retry is not None:
@@ -459,7 +449,19 @@ def rate_limit_openai(request: Request) -> None:
                           headers={"Retry-After": str(retry)})
 
 
-OPENAI_GUARD = [Depends(auth_openai), Depends(rate_limit_openai)]
+# 인증 없음 — 레이트리밋만 건다.
+#
+# GuardBench(정책 회귀 테스트 플랫폼)가 이 두 경로로 우리를 SUT 로 평가하는데,
+# 등록 화면에 Endpoint URL 과 Model 칸만 있고 키를 넣을 자리가 없다. 그래서
+# OpenAI 호환 경로에 한해 인증을 걷어냈다. Authorization·X-API-Key 가 와도
+# 검사하지 않고 그냥 무시한다(있다고 오류를 내지 않는다).
+#
+# 나머지 경로(/v1/chat, /v1/evaluate, /v1/evaluate/batch)의 GUARD 는 그대로다
+# — 모바일 앱과 채팅 UI 가 그 경로를 쓴다.
+#
+# 이 두 경로는 공개 인터넷에 무인증으로 열려 있다. 남용을 막는 것은 IP 단위
+# 레이트리밋 하나뿐이므로 _rate_limited 는 반드시 유지한다.
+OPENAI_GUARD = [Depends(rate_limit_openai)]
 
 
 class OAIMessage(BaseModel):
@@ -597,7 +599,9 @@ def _link_next_turn(prior: list[dict], user_text: str, answer: str,
 def chat_completions(body: ChatCompletionReq) -> dict:
     """OpenAI Chat Completions 호환 엔드포인트.
 
-    인증은 `Authorization: Bearer <키>` 또는 `X-API-Key` 둘 다 받는다.
+    인증이 없다. GuardBench 연동을 위해 열어 둔 경로라 키 없이 호출된다.
+    `Authorization` 이나 `X-API-Key` 가 와도 무시하며, 있다고 거부하지 않는다.
+    분당 레이트리밋은 그대로 적용된다.
 
     - `stream=true` 는 지원하지 않는다(400). 근거성 검증이 끝나야 최종
       응답이 정해지므로, 토큰을 흘려보내면 검증 전에 환각이 노출된다.
@@ -622,7 +626,9 @@ def chat_completions(body: ChatCompletionReq) -> dict:
 @app.get("/v1/models", dependencies=OPENAI_GUARD,
          summary="모델 목록 (OpenAI 호환)", tags=["openai"])
 def list_models() -> dict:
-    """OpenAI 호환 모델 목록. 실제 모델은 `maas-transit` 하나뿐이다."""
+    """OpenAI 호환 모델 목록. 실제 모델은 `maas-transit` 하나뿐이다.
+
+    인증이 없다(`/v1/chat/completions` 와 같다). 분당 레이트리밋은 적용된다."""
     return {
         "object": "list",
         "data": [{
@@ -649,6 +655,7 @@ def list_models() -> dict:
 if __name__ == "__main__":
     import uvicorn
     if not API_KEY:
-        print("경고: MAAS_API_KEY 미설정 — 모든 요청이 401 로 거부됩니다", file=sys.stderr)
+        print("경고: MAAS_API_KEY 미설정 — 인증이 필요한 경로가 401 로 거부됩니다 "
+              "(OpenAI 호환 경로는 무인증이라 영향 없음)", file=sys.stderr)
     print("API: http://0.0.0.0:8080/docs")
     uvicorn.run(app, host="0.0.0.0", port=8080, log_level="warning")
