@@ -351,7 +351,16 @@ def _rail_result_from_api(real: dict, o: dict, d: dict, pax: int | None) -> dict
 
 def search_rail(origin: str | None, destination: str | None,
                 datetime_hint: str | None = None, pax: int | None = None,
-                carried=(), **_) -> dict:
+                carried=(), raw_text=None, **_) -> dict:
+    # 항공 질의가 여기로 오는 경우가 있다(실측: "인천공항 KE081 탑승구"는
+    # search_rail, "비행기 요금"은 fare_policy→search_rail). 철도 시간표를
+    # 뒤져 봐야 답이 없으므로 항공 도구로 넘긴다. 판별 조건은
+    # _is_flight_query 참고 — 철도 낱말이 있으면 넘기지 않는다.
+    if _is_flight_query(raw_text, origin, destination):
+        return search_flight(origin=origin, destination=destination,
+                             datetime_hint=datetime_hint, pax=pax,
+                             carried=carried, raw_text=raw_text)
+
     o, d = resolve_place(origin), resolve_place(destination)
     if not o or not d:
         # 도시철도역 단건 질의("부산 서면역 지하철 시간표")가 여기로 온다.
@@ -552,6 +561,59 @@ def _is_arrival_query(raw_text: str | None) -> bool:
     return any(w.casefold() in t for w in _ARRIVAL_WORDS)
 
 
+# 이 질의가 항공편에 관한 것임을 못 박는 낱말. 게이트가 다른 intent 로
+# 보내도 도구가 이걸 보고 되돌린다.
+_FLIGHT_WORDS = (
+    "항공", "비행기", "비행", "여객기", "편명", "탑승구", "게이트", "터미널",
+    "수하물", "수취대", "체크인", "결항", "회항", "착륙", "이륙",
+    "flight", "airline", "airport", "boarding", "gate", "terminal",
+    "baggage", "luggage", "carousel", "check-in", "checkin",
+    "航班", "飞机", "航空", "登机", "行李", "值机",
+    "航空便", "飛行機", "搭乗", "手荷物", "欠航",
+    "penerbangan", "pesawat", "bandara", "bagasi",
+)
+
+# 철도 질의임을 못 박는 낱말. 하나라도 있으면 항공으로 가로채지 않는다.
+# "인천에서 부산 기차"는 두 지명이 모두 공항으로도 해소되지만 철도 질의다.
+_RAIL_WORDS = (
+    "ktx", "srt", "기차", "열차", "철도", "무궁화", "새마을", "itx",
+    "train", "rail", "railway",
+    "火车", "列车", "高铁", "鉄道", "列車", "新幹線",
+    "kereta",
+)
+
+# 숙박 질의임을 못 박는 낱말. 있으면 숙소 도구를 가로채지 않는다.
+_LODGING_WORDS = (
+    "호텔", "숙소", "숙박", "묵을", "잘 곳", "게스트하우스", "모텔", "펜션",
+    "hotel", "lodging", "stay", "accommodation", "hostel",
+    "酒店", "住宿", "ホテル", "宿泊", "penginapan", "hotel",
+)
+
+
+def _is_flight_query(raw_text: str | None, *places: str | None) -> bool:
+    """게이트가 다른 intent 로 보낸 항공 질의인가.
+
+    게이트 의도 정확도가 38.9% 라 항공 질의가 엉뚱한 도구로 자주 간다.
+    실측(2026-09-04, transit-base):
+      "인천공항 KE081 탑승구 어디야?"      → search_rail
+      "인천공항 도착 수하물 어디서 찾아?"    → search_lodging
+      "김포에서 제주 비행기 요금 얼마야?"    → fare_policy(=search_rail)
+    게이트 프롬프트·스키마는 건드리지 않고(제약 3) 받는 쪽에서 되돌린다.
+    코레일·KRIC 에서 쓴 is_metro_query 와 같은 방법이다.
+
+    조건은 셋 다 만족해야 한다 — 느슨하면 철도 질의를 빼앗는다.
+      1. 항공 낱말이 원문에 있다
+      2. 지명 하나 이상이 공항으로 해소된다
+      3. 철도 낱말이 원문에 없다
+    """
+    t = (raw_text or "").casefold()
+    if not any(w.casefold() in t for w in _FLIGHT_WORDS):
+        return False
+    if any(w.casefold() in t for w in _RAIL_WORDS):
+        return False
+    return any(flight_api.resolve_airport(p) for p in places if p)
+
+
 def _is_airport_status_query(raw_text: str | None, place: str | None) -> bool:
     """이 질의가 "그 공항 지금 어때?" 인가.
 
@@ -732,8 +794,18 @@ def search_flight(origin=None, destination=None, datetime_hint=None, pax=None,
 
 
 def search_lodging(origin=None, destination=None, datetime_hint=None,
-                   pax=None, carried=(), **_) -> dict:
+                   pax=None, carried=(), raw_text=None, **_) -> dict:
     anchor = pick_anchor(origin, destination, carried)
+    # "인천공항 도착 수하물 어디서 찾아?" 가 실측에서 이 intent 로 왔다.
+    # 그대로 두면 수하물을 물은 사람에게 가짜 호텔 목록이 나간다 —
+    # 목 데이터 중에서도 가장 나쁜 오답이다. 숙박 낱말이 없고 항공
+    # 질의로 판별되면 넘긴다.
+    if (not any(w.casefold() in (raw_text or "").casefold()
+                for w in _LODGING_WORDS)
+            and _is_flight_query(raw_text, anchor, origin, destination)):
+        return get_realtime_status(origin=anchor, carried=carried,
+                                   raw_text=raw_text)
+
     d = resolve_place(anchor)
     if not d:
         return _stamp({"found": False, "reason": "unresolved_place",
