@@ -537,6 +537,21 @@ _METRO_AT_AIRPORT_WORDS = ("지하철", "전철", "역", "subway", "metro", "sta
                            "地铁", "车站", "地下鉄", "駅", "kereta", "stasiun")
 
 
+# 도착편을 묻는 표현. 수하물·출구를 물으면 당연히 도착편이다(기능 11).
+_ARRIVAL_WORDS = (
+    "도착", "수하물", "수취대", "짐", "캐리어", "출구", "입국", "받아", "찾아",
+    "arriv", "baggage", "luggage", "carousel", "belt", "exit", "landing", "landed",
+    "到达", "到達", "行李", "提取", "出口", "入境",
+    "到着", "手荷物", "荷物", "受取", "出口", "入国",
+    "tiba", "bagasi", "koper", "keluar", "kedatangan",
+)
+
+
+def _is_arrival_query(raw_text: str | None) -> bool:
+    t = (raw_text or "").casefold()
+    return any(w.casefold() in t for w in _ARRIVAL_WORDS)
+
+
 def _is_airport_status_query(raw_text: str | None, place: str | None) -> bool:
     """이 질의가 "그 공항 지금 어때?" 인가.
 
@@ -548,10 +563,15 @@ def _is_airport_status_query(raw_text: str | None, place: str | None) -> bool:
     t = (raw_text or place).casefold()
     if any(w.casefold() in t for w in _METRO_AT_AIRPORT_WORDS):
         # "김포공항역"처럼 역명으로 부른 경우는 지하철 질의다. 다만 편명이
-        # 함께 있으면("인천공항 KE001 탑승구") 항공편 질의가 분명하다.
+        # 함께 있으면("인천공항 KE081 탑승구") 항공편 질의가 분명하다.
+        # 지하철에도 "출구"가 있어서 이 순서가 중요하다.
         if not _flight_no_in(raw_text):
             return False
-    return any(w.casefold() in t for w in _FLIGHT_STATUS_WORDS)
+    # 도착·수하물 낱말도 항공편 질의다(기능 11). 이걸 빼두면 "인천공항
+    # 도착 수하물 어디서 찾아?" 가 지하철 분기로 새서, 김포는 서울 121장소라
+    # 지하철 도착정보로, 인천은 커버리지 밖으로 답한다.
+    return any(w.casefold() in t
+               for w in _FLIGHT_STATUS_WORDS + _ARRIVAL_WORDS)
 
 
 # 편명은 관례상 대문자로 쓴다. 소문자까지 받으면 다른 언어의 흔한 낱말이
@@ -837,13 +857,30 @@ _FLIGHT_MOCK_LINES = [
 ]
 
 
-def _pick_now(rows: list[dict], has_flight_no: bool, limit: int = 5) -> list[dict]:
+def _arrival_info(f: dict) -> dict | None:
+    """도착편의 수하물수취대·출구·터미널 (기능 11).
+
+    착륙 직후 승객에게 가장 필요한 정보다. **없는 값은 넣지 않는다** —
+    수취대 번호를 지어내면 승객이 엉뚱한 벨트 앞에서 기다린다(제약 6).
+    인천은 carousel·exitNumber 를 도착 응답에서 바로 주고, 한국공항공사는
+    /detail 의 BAGGAGE_CLAIM 에서 온다."""
+    info = {k: f[k] for k in ("carousel", "exit", "terminal") if f.get(k)}
+    return info or None
+
+
+def _pick_now(rows: list[dict], has_flight_no: bool, limit: int = 5,
+              prefer_carousel: bool = False) -> list[dict]:
     """"지금 지연되나요?" 에 하루 첫 편부터 보여주면 답이 되지 않는다.
     현재 시각 언저리(-1시간 ~ +3시간)로 좁히고, 그 안에서 지연·결항을
     먼저 보여준다. 편명을 지정했으면 그 편이 하나뿐이므로 손대지 않는다.
 
     시간대에 아무 것도 없으면(심야 등) 좁히기 전으로 되돌린다 — 빈손보다
-    하루 시간표라도 보여주는 편이 낫다."""
+    하루 시간표라도 보여주는 편이 낫다.
+
+    prefer_carousel: 수하물 질의(기능 11)에서 수취대가 살아 있는 편을
+    앞세운다. **수취대는 수취가 끝나면 해제된다** — 김포 도착편의 수취대
+    보유가 30분 사이에 176편에서 137편으로 줄었다(실측). 이미 내린 항공편을
+    앞세우면 정작 지금 짐을 찾는 사람에게 줄 번호가 없다."""
     if has_flight_no or not rows:
         return rows[:limit]
     now = datetime.now()
@@ -856,10 +893,12 @@ def _pick_now(rows: list[dict], has_flight_no: bool, limit: int = 5) -> list[dic
             return None
 
     near = [f for f in rows if (w := when(f)) and lo <= w <= hi] or rows
-    # 지연·결항을 앞에 둔다. 그 다음은 예정 시각 순서다.
-    near.sort(key=lambda f: (not (f.get("delay_min") or
-                                  f.get("status") in ("결항", "취소")),
-                             f.get("scheduled") or ""))
+    # 수하물 질의면 수취대가 있는 편이 먼저다. 그 다음은 지연·결항,
+    # 그 다음이 예정 시각 순서다.
+    near.sort(key=lambda f: (
+        not (prefer_carousel and f.get("carousel")),
+        not (f.get("delay_min") or f.get("status") in ("결항", "취소")),
+        f.get("scheduled") or ""))
     return near[:limit]
 
 
@@ -871,11 +910,11 @@ def _airport_status_result(anchor: str, raw_text: str | None) -> dict | None:
         return None
 
     flight_no = _flight_no_in(raw_text)
-    # 도착을 물었으면 도착편을, 아니면 출발편을 본다.
-    io = "I" if any(w in (raw_text or "") for w in
-                    ("도착", "arriv", "到达", "到着", "tiba")) else "O"
+    io = "I" if _is_arrival_query(raw_text) else "O"
+    # limit 을 넉넉히 받아 _pick_now 가 현재 시각 언저리를 고르게 한다.
+    # 하루치는 이미 한 번에 받아 캐시돼 있으므로 추가 호출은 없다.
     st = airport_status_api.get_status(port["iata"], io=io,
-                                       flight_no=flight_no, limit=5)
+                                       flight_no=flight_no, limit=0)
 
     if st is None:
         # 키 미등록·조회 실패. 실시간이 아니므로 is_realtime 을 달지 않는다 —
@@ -896,7 +935,8 @@ def _airport_status_result(anchor: str, raw_text: str | None) -> dict | None:
         return _stamp(out, st["source"] + " (공공데이터포털)")
 
     lines, flights = [], []
-    for f in _pick_now(st["_rows"], bool(flight_no)):
+    picked = _pick_now(st["_rows"], bool(flight_no), prefer_carousel=(io == "I"))
+    for f in picked:
         where = f.get("counterpart")
         label = f"{f['flight_no']} {where}".strip() if where else f["flight_no"]
         row = {"line": label}
@@ -911,6 +951,17 @@ def _airport_status_result(anchor: str, raw_text: str | None) -> dict | None:
     out = {"found": True, "airport": port["name_ko"],
            "lines": lines, "flights": flights,
            "is_realtime": True}
+    # 기능 11 — 도착 질의면 수하물·출구를 앞으로 끌어낸다. 목록 안에
+    # 묻어 두면 Supervisor 가 3문장 안에서 놓치기 쉽다.
+    #
+    # 목록의 첫 편이 아니라 **수취대가 실제로 있는 첫 편**을 고른다.
+    # 수취대는 도착이 임박해야 배정되므로(한국공항공사 도착편 2,383건 중
+    # 1,302건만 보유) 첫 편에 없는 일이 흔하다. 없으면 필드를 넣지 않는다.
+    if io == "I":
+        for f in picked:
+            if ai := _arrival_info(f):
+                out["arrival_info"] = {"flight_no": f["flight_no"], **ai}
+                break
     if st.get("total_flights"):
         out["total_flights"] = st["total_flights"]
     ctx = airport_status_api.delay_summary(port["iata"], io=io)
