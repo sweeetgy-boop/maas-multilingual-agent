@@ -3,55 +3,83 @@
 공항 실시간 운항현황 어댑터 — 인천공항공사 + 한국공항공사
 
 공항에 따라 API 가 갈린다. 하나로 덮는 서비스가 없다.
+airports.json 의 operator 로 판정한다.
 
-  ICN        인천국제공항공사  statusOfAllFltDeOdp
-             https://apis.data.go.kr/B551177/statusOfAllFltDeOdp
-  그 외 국내  한국공항공사      FlightStatusList
-             http://openapi.airport.co.kr/service/rest/FlightStatusList
+  IIAC  인천국제공항공사  https://apis.data.go.kr/B551177/statusOfAllFltDeOdp
+        ICN 전용. 일일 500회.
+  KAC   한국공항공사      https://apis.data.go.kr/B551178/flight-status
+        그 외 국내 14개 공항. 오퍼레이션당 일일 5,000회.
 
 두 응답을 공통 형태로 정규화해 호출부가 어느 공항인지 신경 쓰지 않게 한다.
 
-작업 0 실측 결과 (2026-09-04 기준)
+작업 0 실측 (2026-09-04)
 
-  인천 — 동작 확인
-  - **서비스 경로가 가이드 문서와 다르다.** 문서의 서비스 ID `statusOfAllFlt`
-    로는 NO_OPENAPI_SERVICE_ERROR(12) 다. 실제 경로는 `statusOfAllFltDeOdp`
-    (소문자 s 로 시작한다 — 이 포털의 다른 서비스들과 대소문자 규칙이 다르다).
+  인천 — statusOfAllFltDeOdp
   - **items 에 `item` 래퍼가 없다.** `body.items[]` 로 바로 리스트다.
-    TAGO 의 `body.items.item[]` 과 모양이 다르다. numOfRows 를
-    1/2/5/10/100/500/1000/1200 로 바꿔가며 확인했고 전부 리스트였다(제약 4).
+    TAGO·KAC 의 `body.items.item[]` 과 모양이 다르다. numOfRows 를
+    1~1200 으로 바꿔가며 확인했고 전부 리스트였다(제약 4).
   - **searchDate 를 안 주면 오늘이 아니다.** 필터 없이 부르면 여러 날이
-    섞여 11,631건이 온다. 항상 searchDate 를 준다.
-  - 하루 출발 1,208편 · 도착 1,184편. numOfRows 2000 이면 한 페이지다.
-  - **코드셰어 Slave 가 54%(1,200편 중 649편)다.** 중복을 지우지 않으면
-    5편을 보여줘도 실제 선택지는 2편으로 줄어든다(기능 8).
-  - **화물기가 하루 90편 있다.** passengerOrCargo=C 로 확인했다. 요청
-    파라미터 passengerOrCargo=P 로 서버가 걸러준다(기능 7).
-  - **국내선(typeOfFlight=D)도 있다.** 하루 32편, 전부 김해(PUS)행이고
-    제주(CJU)행은 0편이다.
-  - terminalId 는 문서에 없는 **P03 이 최다**다(1,200편 중 616편).
-    P01 231 · P02 153 · 화물은 C01. 문서가 예로 든 C02 는 관측되지 않았다.
+    섞여 11,000건 넘게 온다. 항상 searchDate 를 준다.
+  - 조회 범위는 **D-3 ~ D+6** 이다(D-4·D+7 은 0건). 포털 설명과 일치한다.
+  - **도착 응답에만 carousel(수하물수취대)·exitNumber(출구)가 있다.**
+    도착 100편 표본에서 둘 다 100% 채워져 있었다. 반대로 chkinRange
+    (체크인카운터)는 **출발 응답에만** 있다. 두 오퍼레이션의 필드 집합이
+    다르므로 한쪽 파서로 뭉뚱그리면 값을 흘린다.
+  - 코드셰어 Slave 가 54%(1,200편 중 649편)다. Slave 의 masterFlightId 가
+    같은 응답에 없는 경우는 0건이라, Slave 를 지워도 항공편이 사라지지 않는다.
+  - 화물기가 하루 90편 있다. passengerOrCargo=P 로 서버가 걸러준다.
+  - 국내선(typeOfFlight=D)은 하루 32편뿐이고 김해 25·대구 6·**제주 1**이다.
+  - terminalId 는 문서에 없는 **P03 이 최다**다(1,200편 중 748).
+    P01 272 · P02 180 · 화물은 C01.
   - estimatedDatetime 은 null 이 하나도 없다. 지연 계산이 항상 가능하다.
-    예정과 다른 편이 269/1,200 이고, 그 중 78편은 **예정보다 빠르다**.
-    remark='지연' 27편의 평균 차이는 +42.4분(최대 +150분)이었다.
-  - remark 는 미래 편에서 null 이다(1,200편 중 814편). 값이 있는 것만
-    상태로 쓴다.
 
-  한국공항공사 — **키가 미등록이다**
-  - 엔드포인트는 살아 있다. 경로를 틀리면 "NO OPENAPI SERVICE ERROR",
-    맞으면 "SERVICE KEY IS NOT REGISTERED ERROR"(resultCode 99)로 응답이
-    갈린다. 즉 경로는 맞고 활용신청이 안 된 상태다.
-    data.go.kr 에서 "한국공항공사_실시간 항공기 운항정보" 활용신청이
-    승인되면 열린다.
-  - 따라서 **아래 파싱 코드는 가이드 문서 기준이고 실측 검증되지 않았다.**
-    키가 열리면 반드시 실제 응답과 대조해야 한다. 그때까지 이 경로는
-    None 을 돌려주고, 호출부는 목 데이터로 폴백한다(제약 5).
-    응답이 예상과 다르면 조용히 None 이 되도록 방어적으로 파싱한다 —
-    잘못 읽은 값을 실시간 정보라고 내보내는 것이 최악이다.
+  한국공항공사 — flight-status **(오퍼레이션마다 성격이 다르다)**
+  - 지난 조사에서 "키 미등록"으로 본 것은 **호스트를 잘못 짚은 탓**이었다.
+    openapi.airport.co.kr 은 실재하는 다른 게이트웨이라 그럴듯한 오류를
+    돌려줬다. 포털 값 apis.data.go.kr/B551178 로는 5종 모두 정상이다.
+  - **/info** 실시간 운항정보
+      · schAirCode/schIOType 로 거른다(camelCase).
+      · **searchday 를 무시한다.** D-3·D+0·D+6 모두 같은 216건이 온다 —
+        오늘 하루짜리 피드다.
+      · **gate 가 100% 채워져 있다.** 탑승구를 주는 유일한 목록 오퍼레이션.
+      · rmkKor 도 채워진다. 대신 codeshare·masterflightid 가 없다.
+  - **/depart · /arrival** 지연·결항
+      · airport_code/searchday/flight_id 로 거른다(snake_case).
+      · 조회 범위 **D-3 ~ D+6**(D-4·D+7 은 0건).
+      · codeshare(Y/N)·masterflightid 가 있다. 오늘 기준 Y 가 35%(75/216).
+      · **gate 필드가 아예 없다.**
+      · 미래 날짜는 rmkKor 이 거의 비어 있다(D+1 에서 722/723 이 null)
+        — 상태는 오늘 것만 쓸 수 있다.
+      · **/depart 는 arrvAirportCode, /arrival 은 arrAirportCode** 다.
+        같은 서비스인데 필드명이 갈린다.
+  - **/detail** 상세 현황
+      · **요청 파라미터가 serviceKey·pageNo·numOfRows·type 뿐이다.**
+        공항·날짜·편명 필터가 하나도 없어 전량(4,778건, 48페이지)을 받아
+        로컬에서 걸러야 한다.
+      · **BAGGAGE_CLAIM(수하물 수취대)을 주는 유일한 곳**이다.
+        도착편 2,383건 중 1,302건(55%)이 채워져 있고 출발편은 전부 비었다.
+      · FLIGHT_DATE 범위가 D-1 ~ D+1 사흘치다.
+  - **numOfRows 상한은 100** 이다. 200 이상은 HTTP_ERROR(04).
+  - 커버리지 14개 공항(하루 723편):
+      CJU 247 · GMP 175 · PUS 164 · CJJ 53 · TAE 29 · KWJ 20 · RSU 7 ·
+      HIN 7 · USN 6 · ICN 5 · KPO 3 · KUV 3 · YNY 2 · WJU 2
+  - 여객/화물 구분 필드가 다섯 오퍼레이션 어디에도 없다.
 
-캐시는 60초다. 실시간이므로 짧게 잡는다.
+오퍼레이션 선택 (실측에 따른 결론)
+  오늘 + 실시간·탑승구  → /info      (gate 를 주는 유일한 목록)
+  그 밖의 날짜          → /depart · /arrival  (D-3~D+6, 코드셰어 포함)
+  도착 수하물           → /detail    (BAGGAGE_CLAIM 을 주는 유일한 곳)
+  하나로는 부족해서 셋을 나눠 쓴다.
+
+캐시 (제약 7 — 인천 일일 500회)
+  오늘   TTL   60초  실시간이다. 길게 잡으면 지연 정보가 낡는다.
+  미래   TTL   30분  스케줄은 자주 바뀌지 않는다.
+  과거   TTL    6시간 확정된 기록이라 갱신될 일이 없다.
+  numOfRows 를 크게 잡아 하루치를 한 번에 받고 로컬에서 거른다.
+  편명별로 호출하면 하루치 쿼터를 금방 소진한다.
 
 CLI: python gate/airport_status_api.py --airport GMP --io O
+     python gate/airport_status_api.py --airport ICN --io I
 """
 
 from __future__ import annotations
@@ -69,13 +97,28 @@ import httpx
 import flight_api
 
 ICN_BASE = "https://apis.data.go.kr/B551177/statusOfAllFltDeOdp"
-KAC_BASE = "http://openapi.airport.co.kr/service/rest/FlightStatusList"
+KAC_BASE = "https://apis.data.go.kr/B551178/flight-status"
 KEY = unquote(os.environ.get("DATA_GO_KR_KEY_ENC", ""))
 
-CACHE_TTL_SEC = 60           # 실시간이다. 길게 잡으면 지연 정보가 낡는다
+# 캐시 3단 (제약 7). 날짜에 따라 갱신 필요성이 다르다.
+TTL_TODAY = 60               # 실시간. 길면 지연 정보가 낡는다
+TTL_FUTURE = 30 * 60         # 스케줄은 자주 바뀌지 않는다
+TTL_PAST = 6 * 3600          # 확정된 기록이다
 _cache: dict[str, tuple[float, object]] = {}
 
-TIMEOUT = 20.0
+# 인천은 하루치가 1,200편대라 한 번에 받는다. KAC 는 상한이 100 이라
+# 페이징한다(실측: 200 이상 HTTP_ERROR 04).
+ICN_ROWS = 2000
+KAC_ROWS = 100
+KAC_MAX_PAGES = 12           # 하루 약 720편이면 8페이지면 끝난다
+KAC_DETAIL_MAX_PAGES = 60    # 전량 4,778건 = 48페이지
+
+TIMEOUT = 30.0
+
+# 두 API 의 조회 범위. 밖을 물으면 호출하지 않고 바로 알린다 —
+# 헛호출로 쿼터를 쓰지 않는다.
+RANGE_BACK_DAYS = 3          # D-3
+RANGE_FWD_DAYS = 6           # D+6
 
 # 인천 터미널 코드 → 사람이 읽는 말 (기능 2)
 # 실측에서 P01/P02/P03/C01 네 개가 나왔다. 문서가 예로 든 C02 는 없었다.
@@ -89,17 +132,40 @@ TERMINAL_NAMES = {
 }
 
 
-def _cached(key: str):
+def _ttl_for(ymd: str) -> int:
+    """조회 날짜에 따라 캐시 수명을 고른다. 오늘 것만 자주 갱신하면 된다."""
+    today = date.today().strftime("%Y%m%d")
+    if ymd == today:
+        return TTL_TODAY
+    return TTL_FUTURE if ymd > today else TTL_PAST
+
+
+def _cached(key: str, ttl: int):
     hit = _cache.get(key)
-    if hit is not None and time.time() - hit[0] < CACHE_TTL_SEC:
+    if hit is not None and time.time() - hit[0] < ttl:
         return hit[1]
     return None
 
 
+def _in_range(ymd: str) -> bool:
+    """두 API 모두 D-3 ~ D+6 만 준다(실측). 밖이면 호출하지 않는다."""
+    try:
+        d = datetime.strptime(ymd, "%Y%m%d").date()
+    except ValueError:
+        return False
+    return -RANGE_BACK_DAYS <= (d - date.today()).days <= RANGE_FWD_DAYS
+
+
 # ── 인천국제공항공사 ──────────────────────────────────────
-def _icn_items(body: dict) -> list[dict]:
-    """인천은 body.items[] 로 래퍼가 없다. 그래도 dict 래퍼와 단일 객체를
-    함께 흡수한다 — 두 API 를 한 함수로 다루면 실수가 준다(제약 4)."""
+def _items(body: dict) -> list[dict]:
+    """items 정규화 (제약 4). 세 API 의 모양이 전부 다르다.
+
+      TAGO · KAC  body.items.item[]   ← dict 로 한 겹 감싼다
+      인천         body.items[]        ← 래퍼 없이 바로 리스트
+
+    거기에 공공데이터포털은 1건일 때 리스트가 아니라 단일 객체를 주는
+    경우가 있다. 세 경우를 모두 리스트로 만든다. 실측에서는 어느 API 도
+    단일 객체를 주지 않았지만, 한 줄로 막을 수 있는 위험을 남길 이유가 없다."""
     it = body.get("items")
     if isinstance(it, dict):
         it = it.get("item")
@@ -110,28 +176,26 @@ def _icn_items(body: dict) -> list[dict]:
     return it if isinstance(it, list) else []
 
 
-def _icn_fetch(io: str, ymd: str, flight_id: str | None = None,
-               counterpart: str | None = None,
-               passenger_only: bool = True) -> list[dict] | None:
+def _icn_fetch(io: str, ymd: str, passenger_only: bool = True) -> list[dict] | None:
+    """인천 하루치를 통째로 받는다. 편명·상대공항 필터는 호출부가 로컬에서
+    한다 — 인천은 일일 500회라(제약 7) 편명별 호출은 감당이 안 된다."""
     if not KEY:
         return None
     op = "getFltDeparturesDeOdp" if io == "O" else "getFltArrivalsDeOdp"
-    params = {"serviceKey": KEY, "type": "json", "numOfRows": 2000,
+    # 편명·상대공항으로 좁히지 않고 하루치를 통째로 받는다. 인천은 일일
+    # 500회라(제약 7) 편명별로 부르면 금방 소진된다. 필터는 로컬에서 한다.
+    params = {"serviceKey": KEY, "type": "json", "numOfRows": ICN_ROWS,
               "pageNo": 1, "searchDate": ymd}
     if passenger_only:
         params["passengerOrCargo"] = "P"
-    if flight_id:
-        params["flightId"] = flight_id
-    if counterpart:
-        params["airportCode"] = counterpart
 
-    ck = f"icn|{op}|{ymd}|{flight_id}|{counterpart}|{passenger_only}"
-    if (c := _cached(ck)) is not None:
+    ck = f"icn|{op}|{ymd}|{passenger_only}"
+    if (c := _cached(ck, _ttl_for(ymd))) is not None:
         return c                                          # type: ignore[return-value]
     try:
         r = httpx.get(f"{ICN_BASE}/{op}", params=params, timeout=TIMEOUT)
         r.raise_for_status()
-        out = _icn_items(r.json()["response"]["body"])
+        out = _items(r.json()["response"]["body"])
     except (httpx.HTTPError, KeyError, ValueError, TypeError):
         return None
     _cache[ck] = (time.time(), out)
@@ -139,10 +203,15 @@ def _icn_fetch(io: str, ymd: str, flight_id: str | None = None,
 
 
 def _icn_norm(x: dict, io: str) -> dict:
+    """인천 응답 정규화.
+
+    **출발과 도착의 필드 집합이 다르다.** 도착에만 carousel(수하물수취대)·
+    exitNumber(출구)가 있고, 출발에만 chkinRange(체크인카운터)가 있다.
+    없는 쪽은 None 이 되므로 한 함수로 받아도 값이 섞이지 않는다."""
     sched = _parse_dt(x.get("scheduleDatetime"))
     est = _parse_dt(x.get("estimatedDatetime"))
     term = (x.get("terminalId") or "").strip() or None
-    out = {
+    return _finish({
         "flight_no": (x.get("flightId") or "").strip() or None,
         "airline": (x.get("airline") or "").strip() or None,
         "counterpart": (x.get("airport") or "").strip() or None,
@@ -152,97 +221,201 @@ def _icn_norm(x: dict, io: str) -> dict:
         "status": (x.get("remark") or "").strip() or None,
         "gate": (x.get("gateNumber") or "").strip() or None,
         "terminal": TERMINAL_NAMES.get(term, term),
-        "checkin": _clean_checkin(x.get("chkinRange")),
+        "checkin": _clean_checkin(x.get("chkinRange")),      # 출발 응답에만 있다
+        "carousel": (x.get("carousel") or "").strip() or None,      # 도착 전용
+        "exit": (x.get("exitNumber") or "").strip() or None,        # 도착 전용
         "is_domestic": x.get("typeOfFlight") == "D",
+        "is_cargo": x.get("passengerOrCargo") == "Cargo",
+        "codeshare": (x.get("codeshare") or "").strip() or None,
         "io": io,
-        # 필터링(2단계)에 쓰는 원본 값. 정규화 형태를 소비하는 쪽이
-        # 원문 필드명을 몰라도 되게 여기서 이름을 통일해 둔다.
-        "_cargo": x.get("passengerOrCargo") == "Cargo",
-        "_codeshare": (x.get("codeshare") or "").strip() or None,
         "_master_flight_no": (x.get("masterFlightId") or "").strip() or None,
-    }
-    _set_delay(out, sched, est)
-    return out
+    })
 
 
 # ── 한국공항공사 ─────────────────────────────────────────
-# 주의: 아래는 가이드 문서 기준이고 실측 검증되지 않았다(키 미등록).
-#      키가 열리면 실제 응답과 대조해야 한다.
-def _kac_fetch(iata: str, io: str, line_type: str | None = None) -> list[dict] | None:
+def _kac_get(op: str, params: dict, ymd: str,
+             max_pages: int = KAC_MAX_PAGES) -> list[dict] | None:
+    """KAC 오퍼레이션을 페이징해 전량 받는다. 실패하면 None.
+
+    numOfRows 상한이 100 이라 페이징이 필수다. 한 페이지라도 실패하면
+    부분 결과를 내놓지 않고 None 을 돌려준다 — 잘린 목록을 "이게 전부"인
+    것처럼 보여주는 것이 조용히 틀리는 길이다."""
     if not KEY:
         return None
-    params = {"serviceKey": KEY, "schAirCode": iata, "schIOType": io,
-              "numOfRows": 500, "pageNo": 1}
-    if line_type:
-        params["schLineType"] = line_type
-
-    ck = f"kac|{iata}|{io}|{line_type}"
-    if (c := _cached(ck)) is not None:
+    ck = f"kac|{op}|{sorted((k, str(v)) for k, v in params.items())}"
+    ttl = _ttl_for(ymd)
+    if (c := _cached(ck, ttl)) is not None:
         return c                                          # type: ignore[return-value]
-    try:
-        r = httpx.get(f"{KAC_BASE}/getFlightStatusList", params=params,
-                      timeout=TIMEOUT)
-        r.raise_for_status()
-        rows = _kac_parse(r.text)
-    except (httpx.HTTPError, ET.ParseError, ValueError, TypeError):
-        return None
-    if rows is None:
-        return None
+
+    rows: list[dict] = []
+    for page in range(1, max_pages + 1):
+        try:
+            r = httpx.get(f"{KAC_BASE}/{op}",
+                          params={"serviceKey": KEY, "numOfRows": KAC_ROWS,
+                                  "pageNo": page, "type": "json", **params},
+                          timeout=TIMEOUT)
+            r.raise_for_status()
+            body = r.json()["response"]["body"]
+        except (httpx.HTTPError, KeyError, ValueError, TypeError):
+            return None
+        rows += _items(body)
+        if len(rows) >= int(body.get("totalCount") or 0):
+            break
+
     _cache[ck] = (time.time(), rows)
     return rows
 
 
-def _kac_parse(text: str) -> list[dict] | None:
-    """XML 응답을 파싱한다. 정상(resultCode 00)이 아니면 None 을 돌려
-    호출부가 목 데이터로 폴백하게 한다.
+def _kac_baggage(ymd: str) -> dict[tuple[str, str, str, str], dict] | None:
+    """/detail 전량을 받아 (기준공항, 편명, 날짜) → 상세로 색인한다.
 
-    현재 키로는 resultCode 99(SERVICE KEY IS NOT REGISTERED)가 온다.
-    이 경로가 조용히 None 을 반환하는 것이 의도한 동작이다."""
+    **BAGGAGE_CLAIM 을 주는 유일한 오퍼레이션**인데 필터 파라미터가 하나도
+    없어서(serviceKey·pageNo·numOfRows·type 뿐) 4,778건 48페이지를 통째로
+    받아야 한다. 호출이 비싸므로 도착 조회일 때만 부르고, 캐시 수명도
+    넉넉히 잡는다 — 수취대 배정은 분 단위로 바뀌지 않는다.
+
+    보유 범위가 D-1 ~ D+1 사흘치라 그 밖의 날짜는 부르지 않는다.
+
+    색인 키에 **IO 를 반드시 넣는다.** 같은 공항·같은 편명·같은 날짜가
+    출발과 도착 양쪽에 있어서, IO 없이 묶으면 4,778건이 4,489건으로
+    줄면서 289건이 서로를 덮어쓴다(실측). 출발 행의 빈 BAGGAGE_CLAIM 이
+    도착 행의 값을 지우는 셈이다."""
+    today = date.today()
     try:
-        root = ET.fromstring(text)
-    except ET.ParseError:
-        return None
-    code = root.findtext(".//resultCode")
-    if code is not None and code.strip() not in ("00", "0"):
-        return None
-    return [{c.tag: (c.text or "").strip() for c in item}
-            for item in root.iter("item")]
-
-
-def _kac_norm(x: dict, iata: str, io: str) -> dict:
-    """std/etd 는 "0005" 처럼 HHMM 네 자리다(문서 기준). 날짜가 없으므로
-    오늘로 붙인다. 실시간 조회라 오늘이 맞다."""
-    today = date.today().strftime("%Y-%m-%d")
-    sched = _hhmm(x.get("std"), today)
-    est = _hhmm(x.get("etd"), today)
-    # io 가 I(도착)면 상대 공항은 출발지, O(출발)면 도착지다.
-    counterpart = x.get("boardingKor") if io == "I" else x.get("arrivedKor")
-    out = {
-        "flight_no": x.get("airFln") or None,
-        "airline": x.get("airlineKorean") or None,
-        "counterpart": counterpart or None,
-        "counterpart_code": x.get("city") or None,
-        "scheduled": sched, "estimated": est,
-        "status": x.get("rmkKor") or None,
-        "gate": x.get("gate") or None,
-        "terminal": None,        # 한국공항공사 응답에 터미널 필드가 없다
-        "checkin": None,
-        "is_domestic": (x.get("line") or "").startswith("국내"),
-        "io": io,
-        "_cargo": False,         # 이 API 는 여객/화물 구분 필드가 없다
-        "_codeshare": None,      # 코드셰어 구분 필드도 없다
-        "_master_flight_no": None,
-    }
-    try:
-        _set_delay(out,
-                   datetime.strptime(sched, "%Y-%m-%d %H:%M") if sched else None,
-                   datetime.strptime(est, "%Y-%m-%d %H:%M") if est else None)
+        gap = (datetime.strptime(ymd, "%Y%m%d").date() - today).days
     except ValueError:
-        pass
-    return out
+        return None
+    if abs(gap) > 1:
+        return None
+
+    rows = _kac_get("detail", {}, ymd, max_pages=KAC_DETAIL_MAX_PAGES)
+    if rows is None:
+        return None
+    return {((x.get("AIRPORT") or "").strip(),
+             (x.get("AIR_FLN") or "").strip(),
+             (x.get("FLIGHT_DATE") or "").strip(),
+             (x.get("IO") or "").strip().upper()): x
+            for x in rows}
+
+
+def _kac_fetch(iata: str, io: str, ymd: str) -> tuple[list[dict], str] | None:
+    """KAC 에서 그 공항·그 날의 운항 목록을 받는다.
+    반환: (원본 행들, 어느 오퍼레이션을 썼는지)
+
+    오퍼레이션이 셋인데 주는 것이 서로 달라 질의에 맞춰 고른다.
+      오늘   → /info    gate 와 rmkKor 을 주는 유일한 목록이다.
+      그 외  → /depart · /arrival   D-3~D+6 을 덮고 코드셰어도 준다.
+    /info 는 searchday 를 무시하는 **오늘 전용 피드**라(D-3·D+6 모두 같은
+    216건) 다른 날짜에 쓸 수 없다."""
+    if ymd == date.today().strftime("%Y%m%d"):
+        rows = _kac_get("info", {"schAirCode": iata, "schIOType": io}, ymd)
+        if rows is not None:
+            return rows, "info"
+        # /info 가 실패해도 /depart 로 되짚어 볼 값어치가 있다.
+    op = "arrival" if io == "I" else "depart"
+    rows = _kac_get(op, {"airport_code": iata, "searchday": ymd}, ymd)
+    return (rows, op) if rows is not None else None
+
+
+def _kac_norm_info(x: dict, iata: str, io: str, ymd: str) -> dict:
+    """/info 행 정규화. std/etd 가 "0600" 처럼 HHMM 네 자리라 날짜를 붙인다.
+    io 는 응답의 값을 믿는다 — 요청 필터와 어긋날 일은 없지만 응답이 진실이다."""
+    day = f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:]}"
+    io = (x.get("io") or io).strip().upper()[:1] or io
+    # 도착이면 상대는 출발지, 출발이면 도착지다.
+    ko = x.get("boardingKor") if io == "I" else x.get("arrivedKor")
+    en = x.get("boardingEng") if io == "I" else x.get("arrivedEng")
+    return _finish({
+        "flight_no": (x.get("airFln") or "").strip() or None,
+        "airline": (x.get("airlineKorean") or "").strip() or None,
+        "counterpart": (ko or "").strip() or (en or "").strip() or None,
+        "counterpart_code": (x.get("city") or "").strip() or None,
+        "scheduled": _hhmm(x.get("std"), day),
+        "estimated": _hhmm(x.get("etd"), day),
+        "status": (x.get("rmkKor") or "").strip() or None,
+        "gate": (x.get("gate") or "").strip() or None,
+        "terminal": None,        # KAC 응답에 터미널 필드가 없다
+        "checkin": None,
+        "carousel": None, "exit": None,
+        "is_domestic": (x.get("line") or "").startswith("국내"),
+        "is_cargo": False,       # KAC 는 여객/화물 구분 필드가 없다
+        "codeshare": None,       # /info 에는 코드셰어 필드가 없다
+        "io": io,
+        "_master_flight_no": None,
+    })
+
+
+def _kac_norm_leg(x: dict, iata: str, io: str) -> dict:
+    """/depart · /arrival 행 정규화. 시각이 YYYYMMDDHHMM 이라 그대로 파싱된다.
+
+    **두 오퍼레이션의 도착공항 코드 필드명이 다르다** — /depart 는
+    arrvAirportCode(v 가 있다), /arrival 은 arrAirportCode. 양쪽을 다 본다."""
+    io = (x.get("io") or io).strip().upper()[:1] or io
+    if io == "I":
+        ko, code = x.get("depAirport"), x.get("depAirportCode")
+    else:
+        ko = x.get("arrAirport")
+        code = x.get("arrvAirportCode") or x.get("arrAirportCode")
+    sched = _parse_dt(x.get("scheduledatetime"))
+    est = _parse_dt(x.get("estimateddatetime"))
+    return _finish({
+        "flight_no": (x.get("flightid") or "").strip() or None,
+        "airline": (x.get("airline") or "").strip() or None,
+        "counterpart": (ko or "").strip() or None,
+        "counterpart_code": (code or "").strip() or None,
+        "scheduled": sched.strftime("%Y-%m-%d %H:%M") if sched else None,
+        "estimated": est.strftime("%Y-%m-%d %H:%M") if est else None,
+        "status": (x.get("rmkKor") or "").strip() or None,
+        "gate": None,            # /depart·/arrival 에는 gate 필드가 없다
+        "terminal": None,
+        "checkin": None,
+        "carousel": None, "exit": None,
+        "is_domestic": (x.get("line") or "").startswith("국내"),
+        "is_cargo": False,
+        # codeshare 는 Y/N 로 온다. 인천의 Master/Slave 와 어휘를 맞춘다.
+        "codeshare": ("Slave" if (x.get("codeshare") or "").upper() == "Y"
+                      else "Master"),
+        "io": io,
+        "_master_flight_no": (x.get("masterflightid") or "").strip() or None,
+    })
+
+
+def _kac_add_baggage(flights: list[dict], iata: str, io: str, ymd: str) -> None:
+    """도착편에 수하물수취대와 탑승구를 덧댄다 (기능 11).
+
+    /detail 이 BAGGAGE_CLAIM 을 주는 유일한 곳이라 도착 조회일 때만
+    부른다. 값이 없으면 필드를 넣지 않는다 — 수취대 번호를 지어내면
+    승객이 엉뚱한 곳에서 기다린다."""
+    if io != "I":
+        return
+    idx = _kac_baggage(ymd)
+    if not idx:
+        return
+    for f in flights:
+        d = idx.get((iata, f.get("flight_no") or "", ymd, io))
+        if not d:
+            continue
+        if (bc := (d.get("BAGGAGE_CLAIM") or "").strip()):
+            f["carousel"] = bc
+        if not f.get("gate") and (g := (d.get("GATE") or "").strip()):
+            f["gate"] = g
 
 
 # ── 공통 ────────────────────────────────────────────────
+def _finish(out: dict) -> dict:
+    """정규화 마무리 — 지연을 계산해 붙인다. 세 파서가 공통으로 부른다."""
+    _set_delay(out,
+               _parse_hm(out.get("scheduled")), _parse_hm(out.get("estimated")))
+    return out
+
+
+def _parse_hm(v: str | None) -> datetime | None:
+    try:
+        return datetime.strptime(v or "", "%Y-%m-%d %H:%M")
+    except ValueError:
+        return None
+
+
 def _set_delay(out: dict, sched: datetime | None, est: datetime | None) -> None:
     """예정과 변경 시각의 차이를 분으로 담는다 (기능 4).
 
@@ -289,54 +462,74 @@ def get_status(airport: str, io: str = "O", ymd: str | None = None,
 
     airport   지명·공항명·IATA (airports.json 별칭으로 해소)
     io        "O" 출발 / "I" 도착
-    flight_no 편명으로 좁힌다 ("인천공항 KE001 탑승구 어디야?")
+    flight_no 편명으로 좁힌다 ("인천공항 KE081 탑승구 어디야?")
     domestic  True 국내선만 / False 국제선만 / None 전부 (기능 6)
     include_codeshare
               None 이면 편명 지정 시에만 코드셰어를 남긴다 (기능 8)
 
     화물기는 항상 제외한다 (기능 7). 사용자가 탈 수 없는 항공편이다.
+    도착이면 수하물수취대·출구를 함께 채운다 (기능 11).
+
+    **하루치를 통째로 받아 로컬에서 거른다.** 인천은 일일 500회라(제약 7)
+    편명별로 호출하면 금방 소진된다. 캐시가 있으면 같은 날 다른 편명
+    질의는 호출 없이 답한다.
 
     반환
       성공           {"found": True, "flights": [...], ...}
-      미지원 공항      {"found": False, "reason": ...}
+      미지원·범위 밖   {"found": False, "reason": ...}
       API 실패·키없음  None   ← 호출부가 목 데이터로 폴백한다
     """
     port = flight_api.resolve_airport(airport)
     if not port:
         return {"found": False, "reason": "unresolved_airport",
                 "unresolved": [airport]}
-    if not port.get("domestic"):
+    operator = port.get("operator")
+    if not operator:
         # 해외 공항의 실시간 정보를 주는 API 가 없다. 지어내지 않는다.
         return {"found": False, "reason": "overseas_not_supported",
                 "airport": port["name_ko"]}
 
     io = "I" if str(io).upper().startswith("I") else "O"
     day = ymd or date.today().strftime("%Y%m%d")
+    if not _in_range(day):
+        # 두 API 모두 D-3~D+6 만 준다. 헛호출로 쿼터를 쓰지 않는다.
+        return {"found": False, "reason": "date_out_of_range",
+                "airport": port["name_ko"], "date": day,
+                "note": "실시간 운항정보는 3일 전부터 6일 후까지만 조회됩니다"}
 
-    if port["iata"] == "ICN":
-        rows = _icn_fetch(io, day, flight_id=flight_no, counterpart=counterpart)
+    if operator == "IIAC":
+        rows = _icn_fetch(io, day)
         if rows is None:
             return None
         flights = [_icn_norm(x, io) for x in rows]
         source = "인천국제공항공사 항공기 운항 현황"
     else:
-        rows = _kac_fetch(port["iata"], io)
-        if rows is None:
+        got = _kac_fetch(port["iata"], io, day)
+        if got is None:
             return None
-        flights = [_kac_norm(x, port["iata"], io) for x in rows]
-        if flight_no:
-            fn = flight_no.replace(" ", "").casefold()
-            flights = [f for f in flights
-                       if (f["flight_no"] or "").replace(" ", "").casefold() == fn]
-        source = "한국공항공사 실시간 항공기 운항정보"
+        rows, op = got
+        flights = [(_kac_norm_info(x, port["iata"], io, day) if op == "info"
+                    else _kac_norm_leg(x, port["iata"], io)) for x in rows]
+        _kac_add_baggage(flights, port["iata"], io, day)
+        source = f"한국공항공사 실시간 항공기 운항정보 ({op})"
 
     fetched = len(flights)
 
-    # 기능 7 — 화물기 제외. 인천은 요청 파라미터로 이미 걸렀지만, 서버
-    # 필터를 믿고 끝내지 않는다. 한국공항공사 응답에는 여객/화물 구분
-    # 필드가 아예 없어 여기서 거를 수 있는 것이 없다는 점도 알아둔다.
-    flights = [f for f in flights if not f["_cargo"]]
+    # 기능 7 — 화물기 제외. 인천은 요청 파라미터로 이미 걸렀지만 응답에서
+    # 한 번 더 본다. 서버 필터를 믿고 끝내지 않는다.
+    flights = [f for f in flights if not f["is_cargo"]]
     cargo_excluded = fetched - len(flights)
+
+    # 편명·상대공항 필터는 로컬에서 한다(위 주석 참고 — 쿼터 절약).
+    if flight_no:
+        fn = flight_no.replace(" ", "").casefold()
+        flights = [f for f in flights
+                   if (f["flight_no"] or "").replace(" ", "").casefold() == fn]
+    if counterpart:
+        cp = counterpart.strip().casefold()
+        flights = [f for f in flights
+                   if (f["counterpart_code"] or "").casefold() == cp
+                   or cp in (f["counterpart"] or "").casefold()]
 
     # 기능 6 — 국내선/국제선 구분
     if domestic is not None:
@@ -344,17 +537,18 @@ def get_status(airport: str, io: str = "O", ymd: str | None = None,
 
     # 기능 8 — 코드셰어 중복 제거. 같은 비행기가 여러 항공사 편명으로
     # 중복 노출되면 5편을 보여줘도 실제 선택지가 2편으로 줄어든다.
-    # 실측상 인천 출발 1,200편 중 Slave 가 649편(54%)이고, Slave 의
-    # masterFlightId 가 같은 응답에 없는 경우는 0건이었다(공항 코드로
-    # 좁혀도 마찬가지). Slave 를 지워도 항공편 자체가 사라지지 않는다.
+    # 인천 실측: 1,200편 중 Slave 649편(54%). Slave 의 masterFlightId 가
+    # 같은 응답에 없는 경우는 0건이라 지워도 항공편이 사라지지 않는다.
+    # KAC 는 codeshare Y/N 를 Slave/Master 로 옮겨 같은 규칙을 쓴다.
+    # 다만 KAC 미래 날짜는 전부 'N' 으로 와서(D+1 에서 723/723) 이 필터가
+    # 사실상 동작하지 않는다 — 데이터가 없는 것이지 중복이 없는 것이 아니다.
     #
-    # 다만 "대한항공 KE1234" 처럼 편명을 지정해 물으면 그 편명이 Slave 일
-    # 수 있다. 그때는 남긴다 — 사용자가 가진 항공권의 편명이다.
+    # 편명을 지정해 물으면 그 편명이 Slave 일 수 있으므로 남긴다.
     keep_cs = include_codeshare if include_codeshare is not None else bool(flight_no)
     codeshare_removed = 0
     if not keep_cs:
         before = len(flights)
-        flights = [f for f in flights if f["_codeshare"] != "Slave"]
+        flights = [f for f in flights if f["codeshare"] != "Slave"]
         codeshare_removed = before - len(flights)
 
     flights.sort(key=lambda f: f["scheduled"] or "")
@@ -375,8 +569,6 @@ def get_status(airport: str, io: str = "O", ymd: str | None = None,
     if not flights and fetched:
         # 원본은 있었는데 필터로 다 걸러졌다. "운항이 없다"와 구분해야 한다.
         out["reason"] = "no_flight_after_filter"
-    # 집계용 전체 목록. limit 로 잘린 flights 만으로는 지연 편수를 셀 수
-    # 없다. 밑줄로 시작하는 키는 호출부가 응답에 싣기 전에 걷어낸다.
     out["_rows"] = flights
     return out
 
@@ -396,7 +588,8 @@ def delay_summary(airport: str, io: str = "O") -> dict | None:
         return None
     rows = st.get("_rows") or []
     delayed = [f for f in rows if (f.get("delay_min") or 0) >= 15]
-    cancelled = [f for f in rows if f.get("status") in ("결항", "취소")]
+    cancelled = [f for f in rows
+                 if any(w in (f.get("status") or "") for w in ("결항", "취소"))]
     if not delayed and not cancelled:
         return None
 
@@ -410,6 +603,16 @@ def delay_summary(airport: str, io: str = "O") -> dict | None:
     if delayed:
         out["max_delay_min"] = max(f["delay_min"] for f in delayed)
     return out
+
+
+def _public(obj):
+    """밑줄로 시작하는 내부 키를 걷어낸다. _rows 는 집계용이라 밖으로
+    나갈 이유가 없고, 나가면 응답만 커진다."""
+    if isinstance(obj, dict):
+        return {k: _public(v) for k, v in obj.items() if not k.startswith("_")}
+    if isinstance(obj, list):
+        return [_public(x) for x in obj]
+    return obj
 
 
 # ── CLI ─────────────────────────────────────────────────
@@ -434,7 +637,7 @@ def _cli() -> int:
         print("API 실패 또는 키 미등록 → 호출부는 목 데이터로 폴백합니다",
               file=sys.stderr)
         return 1
-    print(json.dumps(r, ensure_ascii=False, indent=1))
+    print(json.dumps(_public(r), ensure_ascii=False, indent=1))
     return 0
 
 

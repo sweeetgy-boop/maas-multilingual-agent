@@ -32,6 +32,27 @@
     도시와 공항을 잇는다. 이걸 쪼개면 "도쿄"·"나리타" 두 별칭이 공짜로
     나온다 — 사용자는 둘 중 아무거나 부른다.
 
+문서 부록 (작업 0 재실측, 2026-09-04)
+  - **가이드 문서 3종을 gate/ 에 두고 직접 파싱한다.** python-docx 가 없어
+    zipfile + xml.etree 로 word/document.xml 을 읽는다. docx 는 zip 이라
+    표준 라이브러리만으로 표를 꺼낼 수 있다.
+  - icn_airport_guide.docx 부록: **항공사 91행(IATA+ICAO+국문)**,
+    **공항 97행 × 2열 = 186개**(A-K / L-Z 를 한 표에 두 벌로 배치).
+  - 부록과 API 수확본은 겹치지 않는 쪽이 많아 **둘 다 넣는다**:
+      공항   부록 186 · API 172 → 합집합 **236**
+      항공사 부록  91 · API 111 → 합집합 **142**
+    부록에만 있는 공항이 64개(ANC·BOM·CAI…), API 에만 있는 것이 50개
+    (ADD·BOS·CJJ…)다. 한쪽만 쓰면 그만큼이 빈다.
+  - **영문 공항명은 한국공항공사에서 온다.** 부록도 인천 API 도 한글명만
+    주는데, KAC /depart·/arrival 은 depAirportEng/arrAirportEng 를 함께
+    준다(TAOYUAN, JEJU …). 영어 질의를 받으려면 이 이름이 필요하다.
+
+인천 API 호출 최소화 (제약 7)
+  인천은 **일일 500회**로 셋 중 가장 적다. 코드표는 이제 문서 부록이
+  대신하므로 여기서는 **하루치 출발·도착 2회만** 부른다(이전 4일치 8회에서
+  줄였다). KAC 는 오퍼레이션당 5,000회라 하루치 페이징(약 16회)이 부담이
+  아니다.
+
 별칭 방침
   자동 생성(한글명·`/` 분해·접미사 제거·IATA·ICAO)에 더해 중국어·일본어·
   영문 표기는 CURATED_ALIASES 에 손으로 넣는다. 5개 언어를 지원하므로
@@ -53,6 +74,8 @@ import json
 import os
 import re
 import sys
+import zipfile
+from xml.etree import ElementTree as ET
 from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import unquote
@@ -61,6 +84,7 @@ import httpx
 
 HERE = Path(__file__).parent
 OUT_PATH = HERE / "airports.json"
+ICN_DOC_PATH = HERE / "icn_airport_guide.docx"
 TRANSIT_NODES_PATH = HERE / "transit_nodes.json"
 
 TAGO_BASE = "https://apis.data.go.kr/1613000/DmstcFlightNvgInfo"
@@ -68,9 +92,23 @@ ICN_BASE = "https://apis.data.go.kr/B551177/statusOfAllFltDeOdp"
 KEY = unquote(os.environ.get("DATA_GO_KR_KEY_ENC", ""))
 TIMEOUT = 40.0
 
-# 인천 응답을 며칠치 모을지. 하루로도 대부분 나오지만 주 1~2회 운항하는
-# 노선이 빠진다. 4일이면 실측상 160개 공항이 모두 잡혔다.
-HARVEST_DAYS = 4
+KAC_BASE = "https://apis.data.go.kr/B551178/flight-status"
+
+# 인천은 일일 500회다(제약 7). 코드표는 문서 부록이 대신하므로 하루치
+# 출발·도착 2회만 부른다. KAC 는 오퍼레이션당 5,000회라 여유가 있다.
+HARVEST_DAYS = 1
+
+# KAC 는 numOfRows 상한이 100 이다(실측: 200 이상 HTTP_ERROR 04).
+KAC_ROWS = 100
+
+# 어느 API 가 그 공항을 서비스하는가. 실시간 조회 분기에 쓴다.
+#   IIAC 인천국제공항공사  statusOfAllFltDeOdp   (ICN 전용)
+#   KAC  한국공항공사      flight-status          (그 외 국내 14개)
+# 운영 주체와는 다르다 — 양양은 양양국제공항공사가 운영하지만 운항정보는
+# KAC 피드에 실려 온다(실측에서 YNY 2편 확인). 여기서 말하는 operator 는
+# "어느 API 를 부를 것인가" 다.
+OPERATOR_IIAC = "IIAC"
+OPERATOR_KAC = "KAC"
 
 
 # ── 국내 공항 15개: ICAO → IATA + 도시·영문명 ────────────────────
@@ -199,6 +237,64 @@ CURATED_AIRLINE_ALIASES: dict[str, list[str]] = {
 _SUFFIX_RE = re.compile(r"(국제공항|공항|공항공사)$")
 
 
+# ── docx 부록 파서 ──────────────────────────────────────
+# python-docx 없이 읽는다. docx 는 zip 이고 본문은 word/document.xml 이라
+# 표준 라이브러리만으로 표를 꺼낼 수 있다. 의존성을 늘리지 않는 편이
+# 배포(빌드 환경에 pip install 이 없다)에 안전하다.
+_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def _docx_tables(path: Path) -> list[list[list[str]]]:
+    """docx 의 모든 표를 [표][행][셀] 문자열로 돌려준다.
+    파일이 없거나 깨졌으면 빈 리스트 — 부록이 없어도 빌드는 계속된다."""
+    try:
+        with zipfile.ZipFile(path) as z:
+            root = ET.fromstring(z.read("word/document.xml"))
+    except (OSError, KeyError, zipfile.BadZipFile, ET.ParseError):
+        print(f"  ! {path.name} 을 읽지 못했습니다. 부록 없이 진행합니다.",
+              file=sys.stderr)
+        return []
+
+    def text_of(el) -> str:
+        return "".join(t.text or "" for t in el.iter(f"{_W}t")).strip()
+
+    out = []
+    for tbl in root.iter(f"{_W}tbl"):
+        out.append([[text_of(tc) for tc in tr.findall(f"{_W}tc")]
+                    for tr in tbl.findall(f"{_W}tr")])
+    return out
+
+
+def load_icn_appendix() -> tuple[dict[str, str], dict[str, tuple[str, str]]]:
+    """인천공항 가이드 부록에서 코드표를 꺼낸다.
+
+    반환: ({공항IATA: 한글명}, {항공사IATA: (ICAO, 한글명)})
+
+    표를 순서(13번째·14번째)로 집지 않고 **헤더 문구로 찾는다.** 문서가
+    개정되면 표 순서는 바뀌어도 헤더는 남는다.
+      항공사 표  ['IATA 코드', 'ICAO 코드', '항공사명']            91행
+      공항 표    ['공항코드(A-K)', '공항명', '공항코드(L-Z)', '공항명']
+                 97행 × 2열 = 186개 (A-K 와 L-Z 를 한 표에 두 벌로 둔다)
+    """
+    airports: dict[str, str] = {}
+    airlines: dict[str, tuple[str, str]] = {}
+    for tbl in _docx_tables(ICN_DOC_PATH):
+        if not tbl or not tbl[0]:
+            continue
+        head = "|".join(tbl[0])
+        if "IATA" in head and "ICAO" in head:
+            for row in tbl[1:]:
+                if len(row) >= 3 and row[0]:
+                    airlines[row[0].strip()] = (row[1].strip(), row[2].strip())
+        elif "공항코드" in head:
+            for row in tbl[1:]:
+                # 한 행에 (A-K 코드, 이름, L-Z 코드, 이름) 두 쌍이 들어 있다
+                for i in (0, 2):
+                    if len(row) > i + 1 and row[i] and row[i + 1]:
+                        airports[row[i].strip()] = row[i + 1].strip()
+    return airports, airlines
+
+
 def _die(msg: str) -> None:
     print(msg, file=sys.stderr)
     raise SystemExit(1)
@@ -301,7 +397,10 @@ def harvest_incheon() -> tuple[dict[str, str], dict[str, str]]:
 
     항공사 IATA 는 flightId 접두 2자에서 나온다. 실측상 100개 코드
     전부 충돌이 없었다. 코드셰어 Slave 편은 마케팅 항공사의 편명을
-    쓰므로 이 매핑에 그대로 유효하다."""
+    쓰므로 이 매핑에 그대로 유효하다.
+
+    **호출을 하루치 2회로 줄였다**(제약 7 — 인천은 일일 500회). 예전에는
+    4일치 8회를 불렀지만, 이제 문서 부록이 코드표의 대부분을 대신한다."""
     airports: dict[str, str] = {}
     airlines: dict[str, str] = {}
     for off in range(HARVEST_DAYS):
@@ -320,6 +419,49 @@ def harvest_incheon() -> tuple[dict[str, str], dict[str, str]]:
                 if m and x.get("airline"):
                     airlines.setdefault(m.group(1), x["airline"].strip())
     return airports, airlines
+
+
+def harvest_kac() -> dict[str, tuple[str, str]]:
+    """한국공항공사에서 공항 코드 → (한글명, 영문명) 을 긁는다.
+
+    부록도 인천 API 도 한글명만 준다. KAC 의 /depart·/arrival 만
+    depAirportEng/arrAirportEng 를 함께 줘서(TAOYUAN, JEJU …) 영어 질의를
+    받으려면 이 이름이 필요하다.
+
+    주의: 두 오퍼레이션의 필드명이 미묘하게 다르다 — /depart 는
+    **arrvAirportCode**(v 가 있다), /arrival 은 arrAirportCode 다.
+    같은 서비스인데 이름이 갈리므로 양쪽을 다 본다.
+
+    numOfRows 상한은 100 이다(200 이상 HTTP_ERROR 04). 하루치가 약
+    720편이라 오퍼레이션당 8페이지면 끝난다."""
+    out: dict[str, tuple[str, str]] = {}
+    day = date.today().strftime("%Y%m%d")
+    for op in ("depart", "arrival"):
+        got = 0
+        for page in range(1, 12):
+            body = _get(f"{KAC_BASE}/{op}",
+                        {"numOfRows": KAC_ROWS, "pageNo": page, "type": "json",
+                         "searchday": day})
+            if body is None:
+                break
+            rows = _items(body)
+            got += len(rows)
+            for x in rows:
+                # 출발·도착 양쪽 공항을 모두 담는다. 코드 필드명이
+                # 오퍼레이션마다 달라 두 이름을 모두 본다.
+                for code_key, ko_key, en_key in (
+                        ("depAirportCode", "depAirport", "depAirportEng"),
+                        ("arrAirportCode", "arrAirport", "arrAirportEng"),
+                        ("arrvAirportCode", "arrAirport", "arrAirportEng")):
+                    code = (x.get(code_key) or "").strip()
+                    ko = (x.get(ko_key) or "").strip()
+                    en = (x.get(en_key) or "").strip()
+                    if code and ko:
+                        out.setdefault(code, (ko, en))
+            if got >= int(body.get("totalCount") or 0):
+                break
+        print(f"  KAC {op:<8} {got:>5}건")
+    return out
 
 
 def load_coords() -> dict[str, tuple[float, float]]:
@@ -379,83 +521,119 @@ def main() -> int:
     if not KEY:
         _die("DATA_GO_KR_KEY_ENC 가 없습니다. .env 를 확인하세요.")
 
-    print("TAGO 공항 목록…")
+    print("TAGO 공항·항공사 목록…")
     tago_ports = fetch_tago_airports()
-    print(f"  {len(tago_ports)}개")
-    print("TAGO 항공사 목록…")
     tago_airlines = fetch_tago_airlines()
-    print(f"  {len(tago_airlines)}개")
+    print(f"  공항 {len(tago_ports)} · 항공사 {len(tago_airlines)}")
     if not tago_ports:
         _die("TAGO 공항 목록을 받지 못했습니다. 중단합니다.")
 
-    print("인천 응답에서 코드표 수집…")
+    print("인천공항 가이드 부록…")
+    doc_ports, doc_airlines = load_icn_appendix()
+    print(f"  공항 {len(doc_ports)} · 항공사 {len(doc_airlines)}")
+
+    print(f"인천 API 수확 ({HARVEST_DAYS}일치, 제약 7 로 호출 최소화)…")
     icn_ports, icn_airlines = harvest_incheon()
-    print(f"  공항 {len(icn_ports)}개 · 항공사 {len(icn_airlines)}개")
+    print(f"  공항 {len(icn_ports)} · 항공사 {len(icn_airlines)}")
+
+    print("한국공항공사 수확 (영문 공항명)…")
+    kac_ports = harvest_kac()
+    print(f"  공항 {len(kac_ports)}")
 
     print("TAGO 항공사 IATA 유도 (편명 접두)…")
     iata_by_tago = derive_airline_iata(
         [a["airlineId"] for a in tago_airlines],
-        [(p.get("airportId") or "").strip() for p in tago_ports])
+        [(x.get("airportId") or "").strip() for x in tago_ports])
     print(f"  {len(iata_by_tago)}/{len(tago_airlines)}개 유도")
 
     coords = load_coords()
 
     # ── 공항 병합 ────────────────────────────────────────
-    # 1) TAGO 국내 15개가 기준. tago_id 와 좌표·access_note 를 갖는다.
-    # 2) 인천 응답의 국제 공항을 얹는다. tago_id 는 없다.
+    # 1) TAGO 국내 15개가 기준. tago_id·좌표·operator·access_note 를 갖는다.
+    # 2) 부록 186개 + 인천 수확 + KAC 수확(영문명)을 얹는다.
+    #    셋은 겹치지 않는 쪽이 많아 합집합이 각각보다 크다.
     airports: dict[str, dict] = {}
-    for p in tago_ports:
-        aid = (p.get("airportId") or "").strip()
+    for x in tago_ports:
+        aid = (x.get("airportId") or "").strip()
         icao = aid[3:] if aid.startswith("NAA") else None
         meta = DOMESTIC.get(icao or "")
         if not meta:
-            print(f"  ! 미등록 국내 공항 {aid} {p.get('airportNm')} — "
+            print(f"  ! 미등록 국내 공항 {aid} {x.get('airportNm')} — "
                   f"DOMESTIC 표에 추가가 필요합니다", file=sys.stderr)
             continue
-        name_ko = (p.get("airportNm") or "").strip()
+        iata = meta["iata"]
+        name_ko = (x.get("airportNm") or "").strip()
         lat, lon = coords.get(_SUFFIX_RE.sub("", name_ko), (None, None))
-        airports[meta["iata"]] = {
-            "iata": meta["iata"], "icao": icao, "tago_id": aid,
+        airports[iata] = {
+            "iata": iata, "icao": icao, "tago_id": aid,
             "name_ko": name_ko, "name_en": meta["en"], "city_ko": meta["city_ko"],
-            "domestic": True, "lat": lat, "lon": lon,
-            "city_group": CITY_GROUP.get(meta["iata"]),
-            "access_note": ACCESS_NOTES.get(meta["iata"]),
-            "aliases": build_aliases(meta["iata"], icao, name_ko,
-                                     meta["en"], meta["city_ko"]),
+            "domestic": True,
+            "operator": OPERATOR_IIAC if iata == "ICN" else OPERATOR_KAC,
+            "lat": lat, "lon": lon,
+            "city_group": CITY_GROUP.get(iata),
+            "access_note": ACCESS_NOTES.get(iata),
+            "aliases": [],
         }
 
+    def add_foreign(code: str, name_ko: str, name_en: str | None = None) -> None:
+        # 출처가 "도쿄/ 나리타"·"오사카/ 간사이" 처럼 슬래시 뒤에 공백을
+        # 흘린다. 별칭 분해와 표시 양쪽에 걸리므로 여기서 한 번 정리한다.
+        code = code.strip()
+        name_ko = re.sub(r"\s*/\s*", "/", (name_ko or "").strip())
+        if not code or not name_ko:
+            return
+        cur = airports.get(code)
+        if cur is None:
+            airports[code] = {
+                "iata": code, "icao": None, "tago_id": None,
+                "name_ko": name_ko, "name_en": name_en or None, "city_ko": None,
+                "domestic": False, "operator": None,
+                "lat": None, "lon": None, "city_group": None,
+                "access_note": None, "aliases": [],
+            }
+        elif not cur.get("name_en") and name_en:
+            cur["name_en"] = name_en          # 영문명만 뒤늦게 채운다
+
+    for code, name_ko in sorted(doc_ports.items()):
+        add_foreign(code, name_ko)
     for code, name_ko in sorted(icn_ports.items()):
-        if code in airports:                      # 국내 공항은 TAGO 쪽이 우선
-            continue
-        airports[code] = {
-            "iata": code, "icao": None, "tago_id": None,
-            "name_ko": name_ko, "name_en": None, "city_ko": None,
-            "domestic": False, "lat": None, "lon": None,
-            "city_group": None, "access_note": None,
-            "aliases": build_aliases(code, None, name_ko, None, None),
-        }
+        add_foreign(code, name_ko)
+    for code, (name_ko, name_en) in sorted(kac_ports.items()):
+        add_foreign(code, name_ko, name_en)
+
+    for a in airports.values():
+        a["aliases"] = build_aliases(a["iata"], a["icao"], a["name_ko"],
+                                     a["name_en"], a["city_ko"])
 
     # ── 항공사 병합 ──────────────────────────────────────
-    # TAGO(ICAO 3자) 와 인천(IATA 2자) 을 한글명으로 잇는다.
-    # 띄어쓰기가 다르므로("아시아나 항공"/"아시아나항공") 정규화해 맞춘다.
+    # TAGO(ICAO 3자) · 부록(IATA+ICAO) · 인천(편명 접두 IATA) 셋을 합친다.
+    # 이름 비교는 띄어쓰기를 지우고 한다 — 두 API 가 "아시아나 항공"과
+    # "아시아나항공"으로 다르게 준다.
     airlines: dict[str, dict] = {}
-    icn_by_name = {_norm(v): k for k, v in icn_airlines.items()}
+
+    for code, (icao, name_ko) in sorted(doc_airlines.items()):
+        airlines[code] = {"iata": code, "icao": icao or None, "tago_id": None,
+                          "name_ko": name_ko, "domestic": False, "aliases": []}
+
+    by_name = {_norm(v[1]): k for k, v in doc_airlines.items()}
+    by_name.update({_norm(v): k for k, v in icn_airlines.items()})
 
     for a in tago_airlines:
         tid, name_ko = a["airlineId"], (a.get("airlineNm") or "").strip()
-        iata = iata_by_tago.get(tid) or icn_by_name.get(_norm(name_ko))
+        iata = iata_by_tago.get(tid) or by_name.get(_norm(name_ko))
         key = iata or tid
-        airlines[key] = {"iata": iata, "icao": tid, "tago_id": tid,
-                         "name_ko": name_ko, "domestic": True,
-                         "aliases": []}
+        cur = airlines.get(key, {})
+        airlines[key] = {"iata": iata, "icao": cur.get("icao") or tid,
+                         "tago_id": tid,
+                         "name_ko": cur.get("name_ko") or name_ko,
+                         "domestic": True, "aliases": []}
 
     for code, name_ko in sorted(icn_airlines.items()):
-        if code in airlines:
-            continue
-        airlines[code] = {"iata": code, "icao": None, "tago_id": None,
-                          "name_ko": name_ko, "domestic": False, "aliases": []}
+        if code not in airlines:
+            airlines[code] = {"iata": code, "icao": None, "tago_id": None,
+                              "name_ko": name_ko, "domestic": False, "aliases": []}
 
-    for key, a in airlines.items():
+    for a in airlines.values():
         base = [a["name_ko"], _norm(a["name_ko"])]
         if a.get("iata"):
             base.append(a["iata"])
@@ -481,7 +659,10 @@ def main() -> int:
         "generated_at": date.today().isoformat(),
         "source": {
             "tago": f"{TAGO_BASE}/GetArprtList, GetAirmanList",
-            "incheon": f"{ICN_BASE} ({HARVEST_DAYS}일치 출발·도착)",
+            "incheon_doc": f"{ICN_DOC_PATH.name} 부록 (공항 {len(doc_ports)}, "
+                           f"항공사 {len(doc_airlines)})",
+            "incheon_api": f"{ICN_BASE} ({HARVEST_DAYS}일치 출발·도착)",
+            "kac": f"{KAC_BASE} (하루치 depart·arrival, 영문 공항명)",
         },
         "airports": sorted(airports.values(),
                            key=lambda x: (not x["domestic"], x["iata"])),
@@ -491,8 +672,9 @@ def main() -> int:
     OUT_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=1),
                         encoding="utf-8")
     dom = sum(1 for a in out["airports"] if a["domestic"])
-    print(f"\n{OUT_PATH.name}: 공항 {len(out['airports'])}개(국내 {dom}) · "
-          f"항공사 {len(out['airlines'])}개")
+    with_en = sum(1 for a in out["airports"] if a.get("name_en"))
+    print(f"\n{OUT_PATH.name}: 공항 {len(out['airports'])}개(국내 {dom}, "
+          f"영문명 {with_en}) · 항공사 {len(out['airlines'])}개")
     return 0
 
 
