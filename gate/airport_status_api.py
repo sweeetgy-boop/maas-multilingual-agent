@@ -161,10 +161,7 @@ def _icn_norm(x: dict, io: str) -> dict:
         "_codeshare": (x.get("codeshare") or "").strip() or None,
         "_master_flight_no": (x.get("masterFlightId") or "").strip() or None,
     }
-    if sched and est:
-        diff = int((est - sched).total_seconds() // 60)
-        if diff:
-            out["delay_min"] = diff
+    _set_delay(out, sched, est)
     return out
 
 
@@ -236,18 +233,32 @@ def _kac_norm(x: dict, iata: str, io: str) -> dict:
         "_codeshare": None,      # 코드셰어 구분 필드도 없다
         "_master_flight_no": None,
     }
-    if sched and est:
-        try:
-            a = datetime.strptime(sched, "%Y-%m-%d %H:%M")
-            b = datetime.strptime(est, "%Y-%m-%d %H:%M")
-            if diff := int((b - a).total_seconds() // 60):
-                out["delay_min"] = diff
-        except ValueError:
-            pass
+    try:
+        _set_delay(out,
+                   datetime.strptime(sched, "%Y-%m-%d %H:%M") if sched else None,
+                   datetime.strptime(est, "%Y-%m-%d %H:%M") if est else None)
+    except ValueError:
+        pass
     return out
 
 
 # ── 공통 ────────────────────────────────────────────────
+def _set_delay(out: dict, sched: datetime | None, est: datetime | None) -> None:
+    """예정과 변경 시각의 차이를 분으로 담는다 (기능 4).
+
+    차이가 0 이면 필드를 넣지 않는다 — "지연 0분"은 정보가 아니다.
+    **음수는 delay_min 에 넣지 않는다.** 실측상 1,200편 중 78편이 예정보다
+    이르다. -10 을 delay_min 에 넣으면 "10분 지연"으로 읽힐 위험이 있어,
+    조기 출발은 early_min 이라는 다른 이름으로 담는다."""
+    if not (sched and est):
+        return
+    diff = int((est - sched).total_seconds() // 60)
+    if diff > 0:
+        out["delay_min"] = diff
+    elif diff < 0:
+        out["early_min"] = -diff
+
+
 def _parse_dt(v) -> datetime | None:
     try:
         return datetime.strptime(str(v or ""), "%Y%m%d%H%M")
@@ -271,12 +282,19 @@ def _clean_checkin(v) -> str | None:
 def get_status(airport: str, io: str = "O", ymd: str | None = None,
                flight_no: str | None = None,
                counterpart: str | None = None,
+               domestic: bool | None = None,
+               include_codeshare: bool | None = None,
                limit: int = 10) -> dict | None:
     """공항 실시간 운항현황.
 
     airport   지명·공항명·IATA (airports.json 별칭으로 해소)
     io        "O" 출발 / "I" 도착
     flight_no 편명으로 좁힌다 ("인천공항 KE001 탑승구 어디야?")
+    domestic  True 국내선만 / False 국제선만 / None 전부 (기능 6)
+    include_codeshare
+              None 이면 편명 지정 시에만 코드셰어를 남긴다 (기능 8)
+
+    화물기는 항상 제외한다 (기능 7). 사용자가 탈 수 없는 항공편이다.
 
     반환
       성공           {"found": True, "flights": [...], ...}
@@ -312,8 +330,35 @@ def get_status(airport: str, io: str = "O", ymd: str | None = None,
                        if (f["flight_no"] or "").replace(" ", "").casefold() == fn]
         source = "한국공항공사 실시간 항공기 운항정보"
 
+    fetched = len(flights)
+
+    # 기능 7 — 화물기 제외. 인천은 요청 파라미터로 이미 걸렀지만, 서버
+    # 필터를 믿고 끝내지 않는다. 한국공항공사 응답에는 여객/화물 구분
+    # 필드가 아예 없어 여기서 거를 수 있는 것이 없다는 점도 알아둔다.
+    flights = [f for f in flights if not f["_cargo"]]
+    cargo_excluded = fetched - len(flights)
+
+    # 기능 6 — 국내선/국제선 구분
+    if domestic is not None:
+        flights = [f for f in flights if f["is_domestic"] is domestic]
+
+    # 기능 8 — 코드셰어 중복 제거. 같은 비행기가 여러 항공사 편명으로
+    # 중복 노출되면 5편을 보여줘도 실제 선택지가 2편으로 줄어든다.
+    # 실측상 인천 출발 1,200편 중 Slave 가 649편(54%)이고, Slave 의
+    # masterFlightId 가 같은 응답에 없는 경우는 0건이었다(공항 코드로
+    # 좁혀도 마찬가지). Slave 를 지워도 항공편 자체가 사라지지 않는다.
+    #
+    # 다만 "대한항공 KE1234" 처럼 편명을 지정해 물으면 그 편명이 Slave 일
+    # 수 있다. 그때는 남긴다 — 사용자가 가진 항공권의 편명이다.
+    keep_cs = include_codeshare if include_codeshare is not None else bool(flight_no)
+    codeshare_removed = 0
+    if not keep_cs:
+        before = len(flights)
+        flights = [f for f in flights if f["_codeshare"] != "Slave"]
+        codeshare_removed = before - len(flights)
+
     flights.sort(key=lambda f: f["scheduled"] or "")
-    return {
+    out = {
         "found": bool(flights),
         "airport": port["name_ko"], "airport_iata": port["iata"],
         "io": io, "date": day,
@@ -323,6 +368,14 @@ def get_status(airport: str, io: str = "O", ymd: str | None = None,
         "source": source,
         "is_realtime": True,
     }
+    if cargo_excluded:
+        out["cargo_excluded"] = cargo_excluded
+    if codeshare_removed:
+        out["codeshare_removed"] = codeshare_removed
+    if not flights and fetched:
+        # 원본은 있었는데 필터로 다 걸러졌다. "운항이 없다"와 구분해야 한다.
+        out["reason"] = "no_flight_after_filter"
+    return out
 
 
 # ── CLI ─────────────────────────────────────────────────
@@ -333,10 +386,16 @@ def _cli() -> int:
     ap.add_argument("--io", default="O", help="O 출발 / I 도착")
     ap.add_argument("--date", default=None, help="YYYYMMDD (기본 오늘)")
     ap.add_argument("--flight", default=None, help="편명 (예 KE001)")
+    ap.add_argument("--domestic", action="store_true", help="국내선만")
+    ap.add_argument("--international", action="store_true", help="국제선만")
+    ap.add_argument("--with-codeshare", action="store_true",
+                    help="코드셰어 Slave 도 남긴다")
     ap.add_argument("--limit", type=int, default=5)
     a = ap.parse_args()
 
-    r = get_status(a.airport, a.io, a.date, flight_no=a.flight, limit=a.limit)
+    dom = True if a.domestic else (False if a.international else None)
+    r = get_status(a.airport, a.io, a.date, flight_no=a.flight, domestic=dom,
+                   include_codeshare=a.with_codeshare or None, limit=a.limit)
     if r is None:
         print("API 실패 또는 키 미등록 → 호출부는 목 데이터로 폴백합니다",
               file=sys.stderr)
