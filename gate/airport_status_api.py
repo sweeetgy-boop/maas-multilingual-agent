@@ -298,6 +298,32 @@ def _kac_baggage(ymd: str) -> dict[tuple[str, str, str, str], dict] | None:
             for x in rows}
 
 
+def _kac_codeshare(x: dict) -> tuple[str | None, str | None]:
+    """KAC 행에서 (코드셰어 구분, 마스터 편명) 을 뽑는다.
+
+    **codeshare 플래그로 판정하면 안 된다.** Y 는 "이 편이 코드셰어에
+    엮여 있다"는 뜻이지 "이 편이 중복"이라는 뜻이 아니다. 실제로 운항하는
+    편도 Y 로 온다 — 김포 오늘 Y 75건 중 36건이 masterflightid 가 자기
+    자신이었다(BX8025 → BX8025, 에어부산이 실제 운항). Y 를 그대로 Slave 로
+    보면 그 36편이 목록에서 사라진다.
+
+    판정은 **masterflightid 와 flightid 를 견줘서** 한다.
+      같으면      Master (실제 운항편)
+      다르면      Slave  (판매 편명)
+    김포·제주 양쪽에서 슬레이브의 마스터가 같은 응답에 없는 경우는
+    0건이라, Slave 를 지워도 항공편 자체가 사라지지 않는다."""
+    fid = (x.get("flightid") or "").strip()
+    master = (x.get("masterflightid") or "").strip()
+    if not master:
+        return ("Master" if (x.get("codeshare") or "").upper() != "Y" else None), None
+    return ("Master" if master == fid else "Slave"), master
+
+
+def _kac_legs(iata: str, io: str, ymd: str) -> list[dict] | None:
+    op = "arrival" if io == "I" else "depart"
+    return _kac_get(op, {"airport_code": iata, "searchday": ymd}, ymd)
+
+
 def _kac_fetch(iata: str, io: str, ymd: str) -> tuple[list[dict], str] | None:
     """KAC 에서 그 공항·그 날의 운항 목록을 받는다.
     반환: (원본 행들, 어느 오퍼레이션을 썼는지)
@@ -312,9 +338,38 @@ def _kac_fetch(iata: str, io: str, ymd: str) -> tuple[list[dict], str] | None:
         if rows is not None:
             return rows, "info"
         # /info 가 실패해도 /depart 로 되짚어 볼 값어치가 있다.
+    rows = _kac_legs(iata, io, ymd)
     op = "arrival" if io == "I" else "depart"
-    rows = _kac_get(op, {"airport_code": iata, "searchday": ymd}, ymd)
     return (rows, op) if rows is not None else None
+
+
+def _kac_add_codeshare(flights: list[dict], iata: str, io: str, ymd: str) -> None:
+    """/info 로 받은 목록에 코드셰어 여부를 덧댄다 (기능 8).
+
+    오퍼레이션 둘의 강점이 엇갈린다 — /info 만 gate 를 주고,
+    /depart·/arrival 만 codeshare 를 준다. 오늘 조회에서 /info 만 쓰면
+    김포에서 코드셰어 중복이 그대로 남는다(실측: 오늘 216편 중 Y 가 75편,
+    35%). 그래서 오늘은 둘을 다 받아 편명+시각으로 잇는다.
+    KAC 는 오퍼레이션당 일일 5,000회라 한 공항 하루치 3페이지를 더 받는
+    비용이 문제 되지 않는다.
+
+    편명만으로 잇지 않는 이유는 같은 편명이 하루에 두 번 뜰 수 있어서다.
+    예정 시각(HHMM)을 함께 키로 쓴다."""
+    legs = _kac_legs(iata, io, ymd)
+    if not legs:
+        return
+    idx: dict[tuple[str, str], dict] = {}
+    for x in legs:
+        fn = (x.get("flightid") or "").strip()
+        hm = str(x.get("scheduledatetime") or "")[8:12]
+        if fn and hm:
+            idx[(fn, hm)] = x
+    for f in flights:
+        hm = (f.get("scheduled") or "")[-5:].replace(":", "")
+        x = idx.get((f.get("flight_no") or "", hm))
+        if not x:
+            continue
+        f["codeshare"], f["_master_flight_no"] = _kac_codeshare(x)
 
 
 def _kac_norm_info(x: dict, iata: str, io: str, ymd: str) -> dict:
@@ -372,11 +427,10 @@ def _kac_norm_leg(x: dict, iata: str, io: str) -> dict:
         "carousel": None, "exit": None,
         "is_domestic": (x.get("line") or "").startswith("국내"),
         "is_cargo": False,
-        # codeshare 는 Y/N 로 온다. 인천의 Master/Slave 와 어휘를 맞춘다.
-        "codeshare": ("Slave" if (x.get("codeshare") or "").upper() == "Y"
-                      else "Master"),
+        # 인천의 Master/Slave 와 어휘를 맞춘다. 판정 근거는 _kac_codeshare 참고.
+        "codeshare": _kac_codeshare(x)[0],
         "io": io,
-        "_master_flight_no": (x.get("masterflightid") or "").strip() or None,
+        "_master_flight_no": _kac_codeshare(x)[1],
     })
 
 
@@ -510,6 +564,8 @@ def get_status(airport: str, io: str = "O", ymd: str | None = None,
         rows, op = got
         flights = [(_kac_norm_info(x, port["iata"], io, day) if op == "info"
                     else _kac_norm_leg(x, port["iata"], io)) for x in rows]
+        if op == "info":
+            _kac_add_codeshare(flights, port["iata"], io, day)
         _kac_add_baggage(flights, port["iata"], io, day)
         source = f"한국공항공사 실시간 항공기 운항정보 ({op})"
 

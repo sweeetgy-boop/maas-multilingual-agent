@@ -404,12 +404,21 @@ def _empty_reason(o: dict, d: dict, ymd: str) -> dict:
     alt = alternative_airport(o)
     # 대안 공항에 그 날 실제로 노선이 있는지 확인하고 나서 제시한다.
     # 확인 없이 안내하면 없는 노선을 만드는 것과 같다.
-    if alt and alt.get("tago_id") and _raw_search(alt["tago_id"], d["tago_id"], ymd):
+    alt_rows = (_raw_search(alt["tago_id"], d["tago_id"], ymd)
+                if alt and alt.get("tago_id") else None)
+    if alt and alt_rows:
         out["alternative_airport"] = alt["name_ko"]
         out["alternative_iata"] = alt["iata"]
-        out["note"] = (f"{o['name_ko']}에서 {d['name_ko']}까지 가는 직항이 "
-                       f"이 날짜에는 없습니다. {alt['name_ko']}에서 출발하는 "
-                       f"항공편이 있습니다")
+        out["alternative_flights"] = len(_dedup(alt_rows))
+        # 왜 없는지까지 말한다. 인천은 국제선 중심이라 국내선이 하루
+        # 32편뿐이고 그중 제주행은 1편이다(실측). "노선이 없다"만 말하면
+        # 사용자는 조회가 잘못된 줄 안다.
+        why = (f"{o['name_ko']}은 국제선 중심이라 국내선 노선이 거의 없습니다"
+               if o["iata"] == "ICN" else
+               f"{o['name_ko']}에서 {d['name_ko']}까지 가는 직항이 "
+               f"이 날짜에는 없습니다")
+        out["note"] = (f"{why}. {alt['name_ko']}에서 출발하는 항공편이 "
+                       f"{out['alternative_flights']}편 있습니다")
     return out
 
 
