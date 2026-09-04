@@ -7,7 +7,7 @@
       "pos": 53,
       "tox_ok": 107,
       "escalated": 48,
-      "intent_ok": 71,
+      "intent_ok": 70,
       "route_ok": 85,
       "fp": 4,
       "neg": 58,
@@ -17,26 +17,26 @@
     },
     "ALL": {
       "n": 515,
-      "domain_ok": 460,
+      "domain_ok": 461,
       "pos": 242,
       "tox_ok": 507,
       "escalated": 201,
-      "intent_ok": 352,
-      "route_ok": 395,
+      "intent_ok": 353,
+      "route_ok": 397,
       "fp": 10,
       "neg": 273,
       "pii_total": 19,
       "pii_found": 0,
-      "fn": 45
+      "fn": 44
     },
     "en": {
       "n": 97,
       "domain_ok": 90,
       "pos": 44,
       "tox_ok": 96,
-      "intent_ok": 65,
-      "route_ok": 77,
-      "escalated": 32,
+      "intent_ok": 66,
+      "route_ok": 78,
+      "escalated": 33,
       "neg": 53,
       "fp": 1,
       "pii_total": 4,
@@ -73,22 +73,22 @@
     },
     "ja": {
       "n": 104,
-      "domain_ok": 92,
+      "domain_ok": 93,
       "pos": 50,
       "tox_ok": 104,
-      "route_ok": 80,
-      "escalated": 45,
-      "intent_ok": 71,
+      "route_ok": 81,
+      "escalated": 44,
+      "intent_ok": 72,
       "fp": 1,
       "neg": 54,
-      "fn": 11,
+      "fn": 10,
       "pii_total": 3,
       "pii_found": 0
     }
   },
-  "slot_f1": 0.272,
-  "latency_p50": 1.057,
-  "latency_p95": 1.243,
+  "slot_f1": 0.271,
+  "latency_p50": 1.094,
+  "latency_p95": 1.263,
   "errors": [
     [
       "ko-005",
@@ -249,11 +249,6 @@
       "ja-138",
       "domain",
       "want=False got=True [boundary]"
-    ],
-    [
-      "ja-139",
-      "domain",
-      "want=False got=True [pii]"
     ],
     [
       "ja-141",
