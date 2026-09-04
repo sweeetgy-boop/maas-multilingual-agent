@@ -1,0 +1,4578 @@
+{
+ "generated_at": "2026-09-04",
+ "source": {
+  "tago": "https://apis.data.go.kr/1613000/DmstcFlightNvgInfo/GetArprtList, GetAirmanList",
+  "incheon": "https://apis.data.go.kr/B551177/statusOfAllFltDeOdp (4일치 출발·도착)"
+ },
+ "airports": [
+  {
+   "iata": "CJJ",
+   "icao": "RKTU",
+   "tago_id": "NAARKTU",
+   "name_ko": "청주국제공항",
+   "name_en": "Cheongju",
+   "city_ko": "청주",
+   "domestic": true,
+   "lat": 36.7166,
+   "lon": 127.4992,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CJJ",
+    "청주국제공항",
+    "RKTU",
+    "Cheongju",
+    "청주",
+    "청주공항",
+    "清州",
+    "淸州",
+    "清州空港"
+   ]
+  },
+  {
+   "iata": "CJU",
+   "icao": "RKPC",
+   "tago_id": "NAARKPC",
+   "name_ko": "제주국제공항",
+   "name_en": "Jeju",
+   "city_ko": "제주",
+   "domestic": true,
+   "lat": 33.5113,
+   "lon": 126.493,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CJU",
+    "제주국제공항",
+    "RKPC",
+    "Jeju",
+    "제주",
+    "제주공항",
+    "제주도",
+    "Jeju Airport",
+    "济州",
+    "济州岛",
+    "濟州",
+    "済州",
+    "済州島",
+    "チェジュ",
+    "Jeju Island"
+   ]
+  },
+  {
+   "iata": "GMP",
+   "icao": "RKSS",
+   "tago_id": "NAARKSS",
+   "name_ko": "김포국제공항",
+   "name_en": "Gimpo",
+   "city_ko": "서울",
+   "domestic": true,
+   "lat": 37.5586,
+   "lon": 126.7906,
+   "city_group": "서울",
+   "access_note": "김포공항은 지하철 5호선·9호선, 공항철도, 김포골드라인이 연결됩니다",
+   "aliases": [
+    "GMP",
+    "김포국제공항",
+    "RKSS",
+    "Gimpo",
+    "서울",
+    "김포",
+    "김포공항",
+    "Gimpo Airport",
+    "金浦",
+    "金浦机场",
+    "金浦空港",
+    "ソウル/金浦",
+    "Bandara Gimpo"
+   ]
+  },
+  {
+   "iata": "HIN",
+   "icao": "RKPS",
+   "tago_id": "NAARKPS",
+   "name_ko": "사천공항",
+   "name_en": "Sacheon",
+   "city_ko": "사천",
+   "domestic": true,
+   "lat": 35.0885,
+   "lon": 128.07,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "HIN",
+    "사천공항",
+    "RKPS",
+    "Sacheon",
+    "사천",
+    "진주",
+    "진주공항",
+    "泗川",
+    "晋州"
+   ]
+  },
+  {
+   "iata": "ICN",
+   "icao": "RKSI",
+   "tago_id": "NAARKSI",
+   "name_ko": "인천국제공항",
+   "name_en": "Incheon",
+   "city_ko": "인천",
+   "domestic": true,
+   "lat": 37.4602,
+   "lon": 126.4407,
+   "city_group": "서울",
+   "access_note": "인천공항은 공항철도(제1여객터미널역·제2여객터미널역)가 연결됩니다",
+   "aliases": [
+    "ICN",
+    "인천국제공항",
+    "RKSI",
+    "Incheon",
+    "인천",
+    "인천공항",
+    "Incheon Airport",
+    "仁川",
+    "仁川机场",
+    "仁川空港",
+    "インチョン",
+    "Bandara Incheon"
+   ]
+  },
+  {
+   "iata": "KPO",
+   "icao": "RKTH",
+   "tago_id": "NAARKTH",
+   "name_ko": "포항경주공항",
+   "name_en": "Pohang",
+   "city_ko": "포항",
+   "domestic": true,
+   "lat": 35.9878,
+   "lon": 129.4201,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KPO",
+    "포항경주공항",
+    "RKTH",
+    "Pohang",
+    "포항",
+    "포항경주",
+    "포항공항",
+    "경주",
+    "浦项",
+    "浦項"
+   ]
+  },
+  {
+   "iata": "KUV",
+   "icao": "RKJK",
+   "tago_id": "NAARKJK",
+   "name_ko": "군산공항",
+   "name_en": "Gunsan",
+   "city_ko": "군산",
+   "domestic": true,
+   "lat": 35.9038,
+   "lon": 126.6157,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KUV",
+    "군산공항",
+    "RKJK",
+    "Gunsan",
+    "군산",
+    "群山"
+   ]
+  },
+  {
+   "iata": "KWJ",
+   "icao": "RKJJ",
+   "tago_id": "NAARKJJ",
+   "name_ko": "광주공항",
+   "name_en": "Gwangju",
+   "city_ko": "광주",
+   "domestic": true,
+   "lat": 35.1264,
+   "lon": 126.809,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KWJ",
+    "광주공항",
+    "RKJJ",
+    "Gwangju",
+    "광주",
+    "光州",
+    "光州机场",
+    "クァンジュ"
+   ]
+  },
+  {
+   "iata": "MWX",
+   "icao": "RKJB",
+   "tago_id": "NAARKJB",
+   "name_ko": "무안국제공항",
+   "name_en": "Muan",
+   "city_ko": "무안",
+   "domestic": true,
+   "lat": 34.9914,
+   "lon": 126.3827,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "MWX",
+    "무안국제공항",
+    "RKJB",
+    "Muan",
+    "무안",
+    "무안공항",
+    "务安",
+    "務安"
+   ]
+  },
+  {
+   "iata": "PUS",
+   "icao": "RKPK",
+   "tago_id": "NAARKPK",
+   "name_ko": "김해국제공항",
+   "name_en": "Gimhae",
+   "city_ko": "부산",
+   "domestic": true,
+   "lat": 35.1795,
+   "lon": 128.9382,
+   "city_group": null,
+   "access_note": "김해공항은 부산김해경전철 공항역이 연결됩니다",
+   "aliases": [
+    "PUS",
+    "김해국제공항",
+    "RKPK",
+    "Gimhae",
+    "부산",
+    "김해",
+    "김해공항",
+    "부산공항",
+    "Busan",
+    "釜山",
+    "金海",
+    "釜山金海",
+    "プサン",
+    "キメ",
+    "Bandara Busan"
+   ]
+  },
+  {
+   "iata": "RSU",
+   "icao": "RKJY",
+   "tago_id": "NAARKJY",
+   "name_ko": "여수공항",
+   "name_en": "Yeosu",
+   "city_ko": "여수",
+   "domestic": true,
+   "lat": 34.8423,
+   "lon": 127.6169,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "RSU",
+    "여수공항",
+    "RKJY",
+    "Yeosu",
+    "여수",
+    "순천",
+    "丽水",
+    "麗水"
+   ]
+  },
+  {
+   "iata": "TAE",
+   "icao": "RKTN",
+   "tago_id": "NAARKTN",
+   "name_ko": "대구국제공항",
+   "name_en": "Daegu",
+   "city_ko": "대구",
+   "domestic": true,
+   "lat": 35.8941,
+   "lon": 128.6589,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "TAE",
+    "대구국제공항",
+    "RKTN",
+    "Daegu",
+    "대구",
+    "대구공항",
+    "大邱",
+    "大邱机场",
+    "テグ"
+   ]
+  },
+  {
+   "iata": "USN",
+   "icao": "RKPU",
+   "tago_id": "NAARKPU",
+   "name_ko": "울산공항",
+   "name_en": "Ulsan",
+   "city_ko": "울산",
+   "domestic": true,
+   "lat": 35.5935,
+   "lon": 129.352,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "USN",
+    "울산공항",
+    "RKPU",
+    "Ulsan",
+    "울산",
+    "蔚山",
+    "ウルサン"
+   ]
+  },
+  {
+   "iata": "WJU",
+   "icao": "RKNW",
+   "tago_id": "NAARKNW",
+   "name_ko": "원주공항",
+   "name_en": "Wonju",
+   "city_ko": "원주",
+   "domestic": true,
+   "lat": 37.438,
+   "lon": 127.9601,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "WJU",
+    "원주공항",
+    "RKNW",
+    "Wonju",
+    "원주",
+    "횡성",
+    "原州"
+   ]
+  },
+  {
+   "iata": "YNY",
+   "icao": "RKNY",
+   "tago_id": "NAARKNY",
+   "name_ko": "양양국제공항",
+   "name_en": "Yangyang",
+   "city_ko": "양양",
+   "domestic": true,
+   "lat": 37.9686,
+   "lon": 128.6692,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "YNY",
+    "양양국제공항",
+    "RKNY",
+    "Yangyang",
+    "양양",
+    "양양공항",
+    "속초",
+    "강릉",
+    "襄阳",
+    "襄陽"
+   ]
+  },
+  {
+   "iata": "ADD",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "아디스아바바/볼레",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "ADD",
+    "아디스아바바/볼레",
+    "아디스아바바",
+    "볼레"
+   ]
+  },
+  {
+   "iata": "AKL",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "오클랜드(뉴질랜드)",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "AKL",
+    "오클랜드(뉴질랜드)"
+   ]
+  },
+  {
+   "iata": "ALA",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "알마티",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "ALA",
+    "알마티"
+   ]
+  },
+  {
+   "iata": "AMS",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "암스테르담",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "AMS",
+    "암스테르담",
+    "스키폴",
+    "Amsterdam",
+    "Schiphol",
+    "阿姆斯特丹"
+   ]
+  },
+  {
+   "iata": "AOJ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "아오모리",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "AOJ",
+    "아오모리"
+   ]
+  },
+  {
+   "iata": "ASB",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "아쉬가바트",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "ASB",
+    "아쉬가바트"
+   ]
+  },
+  {
+   "iata": "ATL",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "애틀랜타",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "ATL",
+    "애틀랜타",
+    "Atlanta",
+    "亚特兰大",
+    "アトランタ"
+   ]
+  },
+  {
+   "iata": "AUH",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "아부다비",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "AUH",
+    "아부다비"
+   ]
+  },
+  {
+   "iata": "BCN",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "바르셀로나",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "BCN",
+    "바르셀로나"
+   ]
+  },
+  {
+   "iata": "BKI",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "코타키나발루",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "BKI",
+    "코타키나발루"
+   ]
+  },
+  {
+   "iata": "BKK",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "방콕/수완나품",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "BKK",
+    "방콕/수완나품",
+    "방콕",
+    "수완나품",
+    "태국",
+    "Bangkok",
+    "Suvarnabhumi",
+    "曼谷",
+    "バンコク"
+   ]
+  },
+  {
+   "iata": "BNE",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "브리즈번",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "BNE",
+    "브리즈번"
+   ]
+  },
+  {
+   "iata": "BOS",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "보스턴",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "BOS",
+    "보스턴"
+   ]
+  },
+  {
+   "iata": "BSZ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "비슈케크",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "BSZ",
+    "비슈케크"
+   ]
+  },
+  {
+   "iata": "BUD",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "부다페스트",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "BUD",
+    "부다페스트"
+   ]
+  },
+  {
+   "iata": "BWN",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "반다르스리브가완",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "BWN",
+    "반다르스리브가완"
+   ]
+  },
+  {
+   "iata": "CAN",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "광저우",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CAN",
+    "광저우"
+   ]
+  },
+  {
+   "iata": "CDG",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "파리/샤를드골",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CDG",
+    "파리/샤를드골",
+    "파리",
+    "샤를드골",
+    "Paris",
+    "Charles de Gaulle",
+    "巴黎",
+    "パリ"
+   ]
+  },
+  {
+   "iata": "CEB",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "세부",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CEB",
+    "세부"
+   ]
+  },
+  {
+   "iata": "CGK",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "자카르타/수카르노하타",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CGK",
+    "자카르타/수카르노하타",
+    "자카르타",
+    "수카르노하타",
+    "Jakarta",
+    "Soekarno-Hatta",
+    "雅加达",
+    "Bandara Soekarno-Hatta",
+    "ジャカルタ"
+   ]
+  },
+  {
+   "iata": "CGO",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "정저우",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CGO",
+    "정저우"
+   ]
+  },
+  {
+   "iata": "CGQ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "창춘",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CGQ",
+    "창춘"
+   ]
+  },
+  {
+   "iata": "CIT",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "쉼켄트",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CIT",
+    "쉼켄트"
+   ]
+  },
+  {
+   "iata": "CKG",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "충칭",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CKG",
+    "충칭"
+   ]
+  },
+  {
+   "iata": "CMB",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "콜롬보",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CMB",
+    "콜롬보"
+   ]
+  },
+  {
+   "iata": "CNX",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "치앙마이",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CNX",
+    "치앙마이"
+   ]
+  },
+  {
+   "iata": "CPH",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "코펜하겐",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CPH",
+    "코펜하겐"
+   ]
+  },
+  {
+   "iata": "CRK",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "클라크필드",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CRK",
+    "클라크필드"
+   ]
+  },
+  {
+   "iata": "CSX",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "장사",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CSX",
+    "장사"
+   ]
+  },
+  {
+   "iata": "CTS",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "삿포로",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CTS",
+    "삿포로",
+    "신치토세",
+    "Sapporo",
+    "Chitose",
+    "札幌",
+    "新千歳"
+   ]
+  },
+  {
+   "iata": "CXR",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "나트랑",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "CXR",
+    "나트랑"
+   ]
+  },
+  {
+   "iata": "DAD",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "다낭",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "DAD",
+    "다낭",
+    "Da Nang",
+    "岘港",
+    "ダナン"
+   ]
+  },
+  {
+   "iata": "DEL",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "델리",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "DEL",
+    "델리"
+   ]
+  },
+  {
+   "iata": "DFW",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "댈러스/포트워스",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "DFW",
+    "댈러스/포트워스",
+    "댈러스",
+    "포트워스",
+    "Dallas",
+    "Fort Worth",
+    "达拉斯",
+    "ダラス"
+   ]
+  },
+  {
+   "iata": "DLC",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "다롄(대련)",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "DLC",
+    "다롄(대련)"
+   ]
+  },
+  {
+   "iata": "DOH",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "도하",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "DOH",
+    "도하",
+    "카타르",
+    "Doha",
+    "多哈",
+    "ドーハ"
+   ]
+  },
+  {
+   "iata": "DPS",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "덴파사르",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "DPS",
+    "덴파사르",
+    "발리",
+    "Bali",
+    "Denpasar",
+    "巴厘岛",
+    "バリ",
+    "Bandara Ngurah Rai"
+   ]
+  },
+  {
+   "iata": "DSN",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "오르도스",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "DSN",
+    "오르도스"
+   ]
+  },
+  {
+   "iata": "DTW",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "디트로이트",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "DTW",
+    "디트로이트"
+   ]
+  },
+  {
+   "iata": "DXB",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "두바이",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "DXB",
+    "두바이",
+    "Dubai",
+    "迪拜",
+    "ドバイ"
+   ]
+  },
+  {
+   "iata": "DYG",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "장가계",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "DYG",
+    "장가계"
+   ]
+  },
+  {
+   "iata": "EWR",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "뉴어크",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "EWR",
+    "뉴어크"
+   ]
+  },
+  {
+   "iata": "FCO",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "로마",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "FCO",
+    "로마"
+   ]
+  },
+  {
+   "iata": "FOC",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "푸저우",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "FOC",
+    "푸저우"
+   ]
+  },
+  {
+   "iata": "FRA",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "프랑크푸르트",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "FRA",
+    "프랑크푸르트",
+    "Frankfurt",
+    "法兰克福",
+    "フランクフルト"
+   ]
+  },
+  {
+   "iata": "FSZ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "시즈오카",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "FSZ",
+    "시즈오카"
+   ]
+  },
+  {
+   "iata": "FUK",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "후쿠오카",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "FUK",
+    "후쿠오카",
+    "Fukuoka",
+    "福冈",
+    "福岡"
+   ]
+  },
+  {
+   "iata": "GUM",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "괌",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "GUM",
+    "괌",
+    "Guam",
+    "关岛",
+    "グアム"
+   ]
+  },
+  {
+   "iata": "HAK",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "하이커우",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "HAK",
+    "하이커우"
+   ]
+  },
+  {
+   "iata": "HAN",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "하노이",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "HAN",
+    "하노이",
+    "Hanoi",
+    "河内",
+    "ハノイ"
+   ]
+  },
+  {
+   "iata": "HEL",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "헬싱키",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "HEL",
+    "헬싱키"
+   ]
+  },
+  {
+   "iata": "HFE",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "허페이",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "HFE",
+    "허페이"
+   ]
+  },
+  {
+   "iata": "HGH",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "항저우",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "HGH",
+    "항저우"
+   ]
+  },
+  {
+   "iata": "HIJ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "히로시마",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "HIJ",
+    "히로시마"
+   ]
+  },
+  {
+   "iata": "HKG",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "홍콩",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "HKG",
+    "홍콩",
+    "Hong Kong",
+    "香港",
+    "ホンコン"
+   ]
+  },
+  {
+   "iata": "HKT",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "푸켓",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "HKT",
+    "푸켓"
+   ]
+  },
+  {
+   "iata": "HND",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "도쿄/하네다",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "HND",
+    "도쿄/하네다",
+    "도쿄",
+    "하네다",
+    "동경",
+    "Haneda",
+    "Tokyo",
+    "羽田",
+    "東京",
+    "东京",
+    "羽田空港"
+   ]
+  },
+  {
+   "iata": "HNL",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "호놀룰루",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "HNL",
+    "호놀룰루"
+   ]
+  },
+  {
+   "iata": "HPH",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "하이퐁",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "HPH",
+    "하이퐁"
+   ]
+  },
+  {
+   "iata": "HRB",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "하얼빈",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "HRB",
+    "하얼빈"
+   ]
+  },
+  {
+   "iata": "HSG",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "사가",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "HSG",
+    "사가"
+   ]
+  },
+  {
+   "iata": "IAD",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "워싱턴",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "IAD",
+    "워싱턴"
+   ]
+  },
+  {
+   "iata": "ISG",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "이시가키지마",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "ISG",
+    "이시가키지마"
+   ]
+  },
+  {
+   "iata": "IST",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "이스탄불",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "IST",
+    "이스탄불",
+    "터키",
+    "Istanbul",
+    "伊斯坦布尔",
+    "イスタンブール"
+   ]
+  },
+  {
+   "iata": "JFK",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "뉴욕/존에프케네디",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "JFK",
+    "뉴욕/존에프케네디",
+    "뉴욕",
+    "존에프케네디",
+    "New York",
+    "紐約",
+    "纽约",
+    "ニューヨーク"
+   ]
+  },
+  {
+   "iata": "KHH",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "가오슝",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KHH",
+    "가오슝"
+   ]
+  },
+  {
+   "iata": "KIJ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "니가타",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KIJ",
+    "니가타"
+   ]
+  },
+  {
+   "iata": "KIX",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "오사카/ 간사이",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KIX",
+    "오사카/ 간사이",
+    "오사카",
+    "간사이",
+    "Kansai",
+    "Osaka",
+    "関西",
+    "关西",
+    "大阪"
+   ]
+  },
+  {
+   "iata": "KKJ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "키타큐슈",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KKJ",
+    "키타큐슈"
+   ]
+  },
+  {
+   "iata": "KLO",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "칼리보",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KLO",
+    "칼리보"
+   ]
+  },
+  {
+   "iata": "KMG",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "쿤밍",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KMG",
+    "쿤밍"
+   ]
+  },
+  {
+   "iata": "KMI",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "미야자키",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KMI",
+    "미야자키"
+   ]
+  },
+  {
+   "iata": "KMJ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "구마모토",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KMJ",
+    "구마모토"
+   ]
+  },
+  {
+   "iata": "KMQ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "고마쓰",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KMQ",
+    "고마쓰"
+   ]
+  },
+  {
+   "iata": "KOJ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "가고시마",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KOJ",
+    "가고시마"
+   ]
+  },
+  {
+   "iata": "KTI",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "프놈펜/떼조",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KTI",
+    "프놈펜/떼조",
+    "프놈펜",
+    "떼조"
+   ]
+  },
+  {
+   "iata": "KTM",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "카트만두",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KTM",
+    "카트만두"
+   ]
+  },
+  {
+   "iata": "KUL",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "쿠알라룸푸르",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "KUL",
+    "쿠알라룸푸르",
+    "Kuala Lumpur",
+    "吉隆坡",
+    "クアラルンプール"
+   ]
+  },
+  {
+   "iata": "LAS",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "라스베이거스",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "LAS",
+    "라스베이거스"
+   ]
+  },
+  {
+   "iata": "LAX",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "로스앤젤레스",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "LAX",
+    "로스앤젤레스",
+    "엘에이",
+    "Los Angeles",
+    "洛杉矶",
+    "ロサンゼルス"
+   ]
+  },
+  {
+   "iata": "LHR",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "런던/히드로",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "LHR",
+    "런던/히드로",
+    "런던",
+    "히드로",
+    "London",
+    "Heathrow",
+    "伦敦",
+    "ロンドン"
+   ]
+  },
+  {
+   "iata": "LIS",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "리스본",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "LIS",
+    "리스본"
+   ]
+  },
+  {
+   "iata": "LYI",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "린이",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "LYI",
+    "린이"
+   ]
+  },
+  {
+   "iata": "MAD",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "마드리드",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "MAD",
+    "마드리드"
+   ]
+  },
+  {
+   "iata": "MDC",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "마나도",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "MDC",
+    "마나도"
+   ]
+  },
+  {
+   "iata": "MEX",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "멕시코시티",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "MEX",
+    "멕시코시티"
+   ]
+  },
+  {
+   "iata": "MFM",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "마카오",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "MFM",
+    "마카오"
+   ]
+  },
+  {
+   "iata": "MNL",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "마닐라",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "MNL",
+    "마닐라",
+    "Manila",
+    "马尼拉",
+    "マニラ"
+   ]
+  },
+  {
+   "iata": "MSP",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "미니애폴리스",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "MSP",
+    "미니애폴리스"
+   ]
+  },
+  {
+   "iata": "MTY",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "몬테레이",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "MTY",
+    "몬테레이"
+   ]
+  },
+  {
+   "iata": "MUC",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "뮌헨",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "MUC",
+    "뮌헨"
+   ]
+  },
+  {
+   "iata": "MXP",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "밀라노",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "MXP",
+    "밀라노"
+   ]
+  },
+  {
+   "iata": "MYJ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "마쓰야마",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "MYJ",
+    "마쓰야마"
+   ]
+  },
+  {
+   "iata": "NGB",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "닝보",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "NGB",
+    "닝보"
+   ]
+  },
+  {
+   "iata": "NGO",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "나고야",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "NGO",
+    "나고야",
+    "주부",
+    "Nagoya",
+    "Chubu",
+    "名古屋",
+    "中部"
+   ]
+  },
+  {
+   "iata": "NGS",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "나가사키",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "NGS",
+    "나가사키"
+   ]
+  },
+  {
+   "iata": "NKG",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "난징",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "NKG",
+    "난징"
+   ]
+  },
+  {
+   "iata": "NQZ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "아스타나",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "NQZ",
+    "아스타나"
+   ]
+  },
+  {
+   "iata": "NRT",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "도쿄/나리타",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "NRT",
+    "도쿄/나리타",
+    "도쿄",
+    "나리타",
+    "동경",
+    "Narita",
+    "Tokyo",
+    "成田",
+    "東京",
+    "东京",
+    "成田空港"
+   ]
+  },
+  {
+   "iata": "OIT",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "오이타",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "OIT",
+    "오이타"
+   ]
+  },
+  {
+   "iata": "OKA",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "오키나와",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "OKA",
+    "오키나와",
+    "나하",
+    "Okinawa",
+    "Naha",
+    "冲绳",
+    "沖縄",
+    "那覇"
+   ]
+  },
+  {
+   "iata": "OKJ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "오카야마",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "OKJ",
+    "오카야마"
+   ]
+  },
+  {
+   "iata": "ORD",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "시카고/오헤어",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "ORD",
+    "시카고/오헤어",
+    "시카고",
+    "오헤어",
+    "Chicago",
+    "O'Hare",
+    "芝加哥",
+    "シカゴ"
+   ]
+  },
+  {
+   "iata": "PEK",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "베이징/서우두",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "PEK",
+    "베이징/서우두",
+    "베이징",
+    "서우두",
+    "북경",
+    "Beijing",
+    "Peking",
+    "北京",
+    "首都"
+   ]
+  },
+  {
+   "iata": "PKX",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "베이징/다싱",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "PKX",
+    "베이징/다싱",
+    "베이징",
+    "다싱",
+    "북경",
+    "Beijing",
+    "Daxing",
+    "北京",
+    "大兴",
+    "大興"
+   ]
+  },
+  {
+   "iata": "PQC",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "푸꾸옥",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "PQC",
+    "푸꾸옥"
+   ]
+  },
+  {
+   "iata": "PRG",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "프라하",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "PRG",
+    "프라하"
+   ]
+  },
+  {
+   "iata": "PVG",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "상하이/푸동",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "PVG",
+    "상하이/푸동",
+    "상하이",
+    "푸동",
+    "상해",
+    "포동",
+    "Shanghai",
+    "Pudong",
+    "上海",
+    "浦东",
+    "浦東"
+   ]
+  },
+  {
+   "iata": "RGN",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "양곤",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "RGN",
+    "양곤"
+   ]
+  },
+  {
+   "iata": "RMQ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "타이중/칭촨강",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "RMQ",
+    "타이중/칭촨강",
+    "타이중",
+    "칭촨강"
+   ]
+  },
+  {
+   "iata": "SDJ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "센다이",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "SDJ",
+    "센다이"
+   ]
+  },
+  {
+   "iata": "SEA",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "시애틀/타코마",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "SEA",
+    "시애틀/타코마",
+    "시애틀",
+    "타코마",
+    "Seattle",
+    "Tacoma",
+    "西雅图",
+    "シアトル"
+   ]
+  },
+  {
+   "iata": "SFO",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "샌프란시스코",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "SFO",
+    "샌프란시스코",
+    "San Francisco",
+    "旧金山",
+    "サンフランシスコ"
+   ]
+  },
+  {
+   "iata": "SGN",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "호찌민",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "SGN",
+    "호찌민",
+    "호치민",
+    "사이공",
+    "Ho Chi Minh",
+    "Saigon",
+    "胡志明",
+    "ホーチミン"
+   ]
+  },
+  {
+   "iata": "SHE",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "선양(심양)",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "SHE",
+    "선양(심양)"
+   ]
+  },
+  {
+   "iata": "SHI",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "미야코지마/시모지시마",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "SHI",
+    "미야코지마/시모지시마",
+    "미야코지마",
+    "시모지시마"
+   ]
+  },
+  {
+   "iata": "SIN",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "싱가포르",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "SIN",
+    "싱가포르",
+    "창이",
+    "Singapore",
+    "Changi",
+    "新加坡",
+    "シンガポール"
+   ]
+  },
+  {
+   "iata": "SJW",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "스자좡",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "SJW",
+    "스자좡"
+   ]
+  },
+  {
+   "iata": "SLC",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "솔트레이크시티",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "SLC",
+    "솔트레이크시티"
+   ]
+  },
+  {
+   "iata": "SPN",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "사이판",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "SPN",
+    "사이판",
+    "Saipan",
+    "塞班",
+    "サイパン"
+   ]
+  },
+  {
+   "iata": "SYD",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "시드니",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "SYD",
+    "시드니",
+    "Sydney",
+    "悉尼",
+    "シドニー"
+   ]
+  },
+  {
+   "iata": "SYX",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "싼야",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "SYX",
+    "싼야"
+   ]
+  },
+  {
+   "iata": "SZX",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "선전",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "SZX",
+    "선전"
+   ]
+  },
+  {
+   "iata": "TAG",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "보홀 팡라오",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "TAG",
+    "보홀 팡라오"
+   ]
+  },
+  {
+   "iata": "TAK",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "다카마쓰",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "TAK",
+    "다카마쓰"
+   ]
+  },
+  {
+   "iata": "TAO",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "칭다오",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "TAO",
+    "칭다오"
+   ]
+  },
+  {
+   "iata": "TAS",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "타슈켄트",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "TAS",
+    "타슈켄트"
+   ]
+  },
+  {
+   "iata": "TFU",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "청두/톈푸",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "TFU",
+    "청두/톈푸",
+    "청두",
+    "톈푸"
+   ]
+  },
+  {
+   "iata": "TKS",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "도쿠시마",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "TKS",
+    "도쿠시마"
+   ]
+  },
+  {
+   "iata": "TNA",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "지난",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "TNA",
+    "지난"
+   ]
+  },
+  {
+   "iata": "TPE",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "타이베이",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "TPE",
+    "타이베이",
+    "타이페이",
+    "대만",
+    "타오위안",
+    "Taipei",
+    "Taiwan",
+    "Taoyuan",
+    "台北",
+    "臺北",
+    "桃園",
+    "桃园",
+    "タイペイ",
+    "台湾"
+   ]
+  },
+  {
+   "iata": "TSN",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "톈진",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "TSN",
+    "톈진"
+   ]
+  },
+  {
+   "iata": "UBN",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "신 울란바타르",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "UBN",
+    "신 울란바타르",
+    "울란바토르",
+    "Ulaanbaatar",
+    "乌兰巴托"
+   ]
+  },
+  {
+   "iata": "UKB",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "고베",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "UKB",
+    "고베"
+   ]
+  },
+  {
+   "iata": "URC",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "우루무치",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "URC",
+    "우루무치"
+   ]
+  },
+  {
+   "iata": "VIE",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "비엔나",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "VIE",
+    "비엔나"
+   ]
+  },
+  {
+   "iata": "VTE",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "비엔티안",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "VTE",
+    "비엔티안"
+   ]
+  },
+  {
+   "iata": "WAW",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "바르샤바",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "WAW",
+    "바르샤바"
+   ]
+  },
+  {
+   "iata": "WEH",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "웨이하이",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "WEH",
+    "웨이하이"
+   ]
+  },
+  {
+   "iata": "WNZ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "원저우",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "WNZ",
+    "원저우"
+   ]
+  },
+  {
+   "iata": "WRO",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "브로츠와프",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "WRO",
+    "브로츠와프"
+   ]
+  },
+  {
+   "iata": "WUH",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "우한",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "WUH",
+    "우한"
+   ]
+  },
+  {
+   "iata": "WUX",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "우시",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "WUX",
+    "우시"
+   ]
+  },
+  {
+   "iata": "XIY",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "시안",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "XIY",
+    "시안"
+   ]
+  },
+  {
+   "iata": "XMN",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "샤먼",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "XMN",
+    "샤먼"
+   ]
+  },
+  {
+   "iata": "YCU",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "윈청옌후 국제공항",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "YCU",
+    "윈청옌후 국제공항",
+    "윈청옌후"
+   ]
+  },
+  {
+   "iata": "YGJ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "요나고",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "YGJ",
+    "요나고"
+   ]
+  },
+  {
+   "iata": "YNJ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "옌지(연길)",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "YNJ",
+    "옌지(연길)"
+   ]
+  },
+  {
+   "iata": "YNT",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "옌타이",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "YNT",
+    "옌타이"
+   ]
+  },
+  {
+   "iata": "YNZ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "옌청",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "YNZ",
+    "옌청"
+   ]
+  },
+  {
+   "iata": "YTY",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "양저우",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "YTY",
+    "양저우"
+   ]
+  },
+  {
+   "iata": "YUL",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "몬트리올",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "YUL",
+    "몬트리올"
+   ]
+  },
+  {
+   "iata": "YVR",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "밴쿠버",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "YVR",
+    "밴쿠버",
+    "Vancouver",
+    "温哥华",
+    "バンクーバー"
+   ]
+  },
+  {
+   "iata": "YYC",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "캘거리",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "YYC",
+    "캘거리"
+   ]
+  },
+  {
+   "iata": "YYZ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "토론토",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "YYZ",
+    "토론토"
+   ]
+  },
+  {
+   "iata": "ZAG",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "자그레브",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "ZAG",
+    "자그레브"
+   ]
+  },
+  {
+   "iata": "ZRH",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "취리히",
+   "name_en": null,
+   "city_ko": null,
+   "domestic": false,
+   "lat": null,
+   "lon": null,
+   "city_group": null,
+   "access_note": null,
+   "aliases": [
+    "ZRH",
+    "취리히"
+   ]
+  }
+ ],
+ "airlines": [
+  {
+   "iata": "7C",
+   "icao": "JJA",
+   "tago_id": "JJA",
+   "name_ko": "제주 항공",
+   "domestic": true,
+   "aliases": [
+    "제주 항공",
+    "제주항공",
+    "7C",
+    "JJA",
+    "제주에어",
+    "Jeju Air",
+    "济州航空",
+    "チェジュ航空"
+   ]
+  },
+  {
+   "iata": "BX",
+   "icao": "ABL",
+   "tago_id": "ABL",
+   "name_ko": "에어 부산",
+   "domestic": true,
+   "aliases": [
+    "에어 부산",
+    "에어부산",
+    "BX",
+    "ABL",
+    "Air Busan",
+    "釜山航空",
+    "エアプサン"
+   ]
+  },
+  {
+   "iata": "KE",
+   "icao": "KAL",
+   "tago_id": "KAL",
+   "name_ko": "대한항공",
+   "domestic": true,
+   "aliases": [
+    "대한항공",
+    "KE",
+    "KAL",
+    "대한",
+    "Korean Air",
+    "大韓航空",
+    "大韩航空",
+    "コリアンエア"
+   ]
+  },
+  {
+   "iata": "LJ",
+   "icao": "JNA",
+   "tago_id": "JNA",
+   "name_ko": "진에어",
+   "domestic": true,
+   "aliases": [
+    "진에어",
+    "LJ",
+    "JNA",
+    "Jin Air",
+    "真航空",
+    "ジンエアー"
+   ]
+  },
+  {
+   "iata": "OZ",
+   "icao": "AAR",
+   "tago_id": "AAR",
+   "name_ko": "아시아나 항공",
+   "domestic": true,
+   "aliases": [
+    "아시아나 항공",
+    "아시아나항공",
+    "OZ",
+    "AAR",
+    "아시아나",
+    "Asiana",
+    "Asiana Airlines",
+    "韩亚航空",
+    "アシアナ"
+   ]
+  },
+  {
+   "iata": "RF",
+   "icao": "EOK",
+   "tago_id": "EOK",
+   "name_ko": "에어로 K",
+   "domestic": true,
+   "aliases": [
+    "에어로 K",
+    "에어로K",
+    "RF",
+    "EOK",
+    "에어로케이",
+    "Aero K"
+   ]
+  },
+  {
+   "iata": "RS",
+   "icao": "ASV",
+   "tago_id": "ASV",
+   "name_ko": "에어 서울",
+   "domestic": true,
+   "aliases": [
+    "에어 서울",
+    "에어서울",
+    "RS",
+    "ASV",
+    "Air Seoul",
+    "首尔航空",
+    "エアソウル"
+   ]
+  },
+  {
+   "iata": "TW",
+   "icao": "TWB",
+   "tago_id": "TWB",
+   "name_ko": "티웨이 항공",
+   "domestic": true,
+   "aliases": [
+    "티웨이 항공",
+    "티웨이항공",
+    "TW",
+    "TWB",
+    "티웨이",
+    "T'way",
+    "Tway Air",
+    "德威航空"
+   ]
+  },
+  {
+   "iata": "WE",
+   "icao": "PTA",
+   "tago_id": "PTA",
+   "name_ko": "파라타항공",
+   "domestic": true,
+   "aliases": [
+    "파라타항공",
+    "WE",
+    "PTA",
+    "파라타",
+    "Parata Air"
+   ]
+  },
+  {
+   "iata": "XU",
+   "icao": "XUM",
+   "tago_id": "XUM",
+   "name_ko": "섬에어",
+   "domestic": true,
+   "aliases": [
+    "섬에어",
+    "XU",
+    "XUM",
+    "Sum Air"
+   ]
+  },
+  {
+   "iata": "YP",
+   "icao": "APZ",
+   "tago_id": "APZ",
+   "name_ko": "에어프레미아",
+   "domestic": true,
+   "aliases": [
+    "에어프레미아",
+    "YP",
+    "APZ",
+    "Air Premia"
+   ]
+  },
+  {
+   "iata": "ZE",
+   "icao": "ESR",
+   "tago_id": "ESR",
+   "name_ko": "이스타항공",
+   "domestic": true,
+   "aliases": [
+    "이스타항공",
+    "ZE",
+    "ESR",
+    "이스타",
+    "Eastar Jet",
+    "易斯达航空"
+   ]
+  },
+  {
+   "iata": null,
+   "icao": "AIH",
+   "tago_id": "AIH",
+   "name_ko": "에어제타",
+   "domestic": true,
+   "aliases": [
+    "에어제타",
+    "AIH"
+   ]
+  },
+  {
+   "iata": "3U",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "사천항공",
+   "domestic": false,
+   "aliases": [
+    "사천항공",
+    "3U"
+   ]
+  },
+  {
+   "iata": "5J",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "세부퍼시픽항공",
+   "domestic": false,
+   "aliases": [
+    "세부퍼시픽항공",
+    "5J"
+   ]
+  },
+  {
+   "iata": "8M",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "미얀마국제항공",
+   "domestic": false,
+   "aliases": [
+    "미얀마국제항공",
+    "8M"
+   ]
+  },
+  {
+   "iata": "9C",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "춘추항공",
+   "domestic": false,
+   "aliases": [
+    "춘추항공",
+    "9C"
+   ]
+  },
+  {
+   "iata": "9G",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "썬푸꾸옥항공",
+   "domestic": false,
+   "aliases": [
+    "썬푸꾸옥항공",
+    "9G"
+   ]
+  },
+  {
+   "iata": "AA",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "아메리칸항공",
+   "domestic": false,
+   "aliases": [
+    "아메리칸항공",
+    "AA"
+   ]
+  },
+  {
+   "iata": "AC",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에어캐나다",
+   "domestic": false,
+   "aliases": [
+    "에어캐나다",
+    "AC"
+   ]
+  },
+  {
+   "iata": "AF",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에어 프랑스",
+   "domestic": false,
+   "aliases": [
+    "에어 프랑스",
+    "에어프랑스",
+    "AF"
+   ]
+  },
+  {
+   "iata": "AI",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에어인디아 리미티드",
+   "domestic": false,
+   "aliases": [
+    "에어인디아 리미티드",
+    "에어인디아리미티드",
+    "AI"
+   ]
+  },
+  {
+   "iata": "AK",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에어아시아 버하드",
+   "domestic": false,
+   "aliases": [
+    "에어아시아 버하드",
+    "에어아시아버하드",
+    "AK"
+   ]
+  },
+  {
+   "iata": "AM",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "아에로멕시코",
+   "domestic": false,
+   "aliases": [
+    "아에로멕시코",
+    "AM"
+   ]
+  },
+  {
+   "iata": "AR",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "아르헨티나 항공",
+   "domestic": false,
+   "aliases": [
+    "아르헨티나 항공",
+    "아르헨티나항공",
+    "AR"
+   ]
+  },
+  {
+   "iata": "AS",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "알래스카 항공",
+   "domestic": false,
+   "aliases": [
+    "알래스카 항공",
+    "알래스카항공",
+    "AS"
+   ]
+  },
+  {
+   "iata": "AT",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "로얄 에어 모로코",
+   "domestic": false,
+   "aliases": [
+    "로얄 에어 모로코",
+    "로얄에어모로코",
+    "AT"
+   ]
+  },
+  {
+   "iata": "AY",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "핀에어",
+   "domestic": false,
+   "aliases": [
+    "핀에어",
+    "AY"
+   ]
+  },
+  {
+   "iata": "B7",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "유니항공",
+   "domestic": false,
+   "aliases": [
+    "유니항공",
+    "B7"
+   ]
+  },
+  {
+   "iata": "BA",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "영국항공",
+   "domestic": false,
+   "aliases": [
+    "영국항공",
+    "BA"
+   ]
+  },
+  {
+   "iata": "BI",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "로얄브루나이항공",
+   "domestic": false,
+   "aliases": [
+    "로얄브루나이항공",
+    "BI"
+   ]
+  },
+  {
+   "iata": "BR",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에바항공",
+   "domestic": false,
+   "aliases": [
+    "에바항공",
+    "BR"
+   ]
+  },
+  {
+   "iata": "C6",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "센트럼항공",
+   "domestic": false,
+   "aliases": [
+    "센트럼항공",
+    "C6"
+   ]
+  },
+  {
+   "iata": "CA",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "중국국제항공",
+   "domestic": false,
+   "aliases": [
+    "중국국제항공",
+    "CA"
+   ]
+  },
+  {
+   "iata": "CI",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "중화항공",
+   "domestic": false,
+   "aliases": [
+    "중화항공",
+    "CI"
+   ]
+  },
+  {
+   "iata": "CM",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "코파항공",
+   "domestic": false,
+   "aliases": [
+    "코파항공",
+    "CM"
+   ]
+  },
+  {
+   "iata": "CX",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "캐세이퍼시픽항공",
+   "domestic": false,
+   "aliases": [
+    "캐세이퍼시픽항공",
+    "CX"
+   ]
+  },
+  {
+   "iata": "CZ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "중국남방항공",
+   "domestic": false,
+   "aliases": [
+    "중국남방항공",
+    "CZ"
+   ]
+  },
+  {
+   "iata": "D7",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에어아시아엑스",
+   "domestic": false,
+   "aliases": [
+    "에어아시아엑스",
+    "D7"
+   ]
+  },
+  {
+   "iata": "DL",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "델타항공",
+   "domestic": false,
+   "aliases": [
+    "델타항공",
+    "DL"
+   ]
+  },
+  {
+   "iata": "DV",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "스캇항공",
+   "domestic": false,
+   "aliases": [
+    "스캇항공",
+    "DV"
+   ]
+  },
+  {
+   "iata": "EK",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에미레이트항공",
+   "domestic": false,
+   "aliases": [
+    "에미레이트항공",
+    "EK"
+   ]
+  },
+  {
+   "iata": "ET",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에티오피아항공",
+   "domestic": false,
+   "aliases": [
+    "에티오피아항공",
+    "ET"
+   ]
+  },
+  {
+   "iata": "EY",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에티하드 항공",
+   "domestic": false,
+   "aliases": [
+    "에티하드 항공",
+    "에티하드항공",
+    "EY"
+   ]
+  },
+  {
+   "iata": "FM",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "상하이항공",
+   "domestic": false,
+   "aliases": [
+    "상하이항공",
+    "FM"
+   ]
+  },
+  {
+   "iata": "GA",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "가루다인도네시아",
+   "domestic": false,
+   "aliases": [
+    "가루다인도네시아",
+    "GA"
+   ]
+  },
+  {
+   "iata": "GS",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "천진항공",
+   "domestic": false,
+   "aliases": [
+    "천진항공",
+    "GS"
+   ]
+  },
+  {
+   "iata": "HA",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "하와이안 항공",
+   "domestic": false,
+   "aliases": [
+    "하와이안 항공",
+    "하와이안항공",
+    "HA"
+   ]
+  },
+  {
+   "iata": "HH",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "카놋샤크",
+   "domestic": false,
+   "aliases": [
+    "카놋샤크",
+    "HH"
+   ]
+  },
+  {
+   "iata": "HO",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "길상항공",
+   "domestic": false,
+   "aliases": [
+    "길상항공",
+    "HO"
+   ]
+  },
+  {
+   "iata": "HU",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "중국해남항공",
+   "domestic": false,
+   "aliases": [
+    "중국해남항공",
+    "HU"
+   ]
+  },
+  {
+   "iata": "HX",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "홍콩항공",
+   "domestic": false,
+   "aliases": [
+    "홍콩항공",
+    "HX"
+   ]
+  },
+  {
+   "iata": "HY",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "우즈베키스탄항공",
+   "domestic": false,
+   "aliases": [
+    "우즈베키스탄항공",
+    "HY"
+   ]
+  },
+  {
+   "iata": "IB",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "이베리아항공",
+   "domestic": false,
+   "aliases": [
+    "이베리아항공",
+    "IB"
+   ]
+  },
+  {
+   "iata": "IT",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "타이거에어 타이완",
+   "domestic": false,
+   "aliases": [
+    "타이거에어 타이완",
+    "타이거에어타이완",
+    "IT"
+   ]
+  },
+  {
+   "iata": "JL",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "일본항공",
+   "domestic": false,
+   "aliases": [
+    "일본항공",
+    "JL"
+   ]
+  },
+  {
+   "iata": "JQ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "젯스타",
+   "domestic": false,
+   "aliases": [
+    "젯스타",
+    "JQ"
+   ]
+  },
+  {
+   "iata": "JT",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "라이온에어",
+   "domestic": false,
+   "aliases": [
+    "라이온에어",
+    "JT"
+   ]
+  },
+  {
+   "iata": "JU",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에어세르비아",
+   "domestic": false,
+   "aliases": [
+    "에어세르비아",
+    "JU"
+   ]
+  },
+  {
+   "iata": "KC",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에어 아스타나",
+   "domestic": false,
+   "aliases": [
+    "에어 아스타나",
+    "에어아스타나",
+    "KC"
+   ]
+  },
+  {
+   "iata": "KL",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "KLM네덜란드항공",
+   "domestic": false,
+   "aliases": [
+    "KLM네덜란드항공",
+    "KL"
+   ]
+  },
+  {
+   "iata": "KN",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "중국연합항공",
+   "domestic": false,
+   "aliases": [
+    "중국연합항공",
+    "KN"
+   ]
+  },
+  {
+   "iata": "KQ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "케냐항공",
+   "domestic": false,
+   "aliases": [
+    "케냐항공",
+    "KQ"
+   ]
+  },
+  {
+   "iata": "KU",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "쿠웨이트 항공",
+   "domestic": false,
+   "aliases": [
+    "쿠웨이트 항공",
+    "쿠웨이트항공",
+    "KU"
+   ]
+  },
+  {
+   "iata": "LA",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "란항공",
+   "domestic": false,
+   "aliases": [
+    "란항공",
+    "LA"
+   ]
+  },
+  {
+   "iata": "LH",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "루프트한자 독일항공",
+   "domestic": false,
+   "aliases": [
+    "루프트한자 독일항공",
+    "루프트한자독일항공",
+    "LH"
+   ]
+  },
+  {
+   "iata": "LO",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "폴란드항공",
+   "domestic": false,
+   "aliases": [
+    "폴란드항공",
+    "LO"
+   ]
+  },
+  {
+   "iata": "LX",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "스위스 국제항공",
+   "domestic": false,
+   "aliases": [
+    "스위스 국제항공",
+    "스위스국제항공",
+    "LX"
+   ]
+  },
+  {
+   "iata": "LY",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "이스라엘항공",
+   "domestic": false,
+   "aliases": [
+    "이스라엘항공",
+    "LY"
+   ]
+  },
+  {
+   "iata": "M0",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에어로 몽골리아",
+   "domestic": false,
+   "aliases": [
+    "에어로 몽골리아",
+    "에어로몽골리아",
+    "M0"
+   ]
+  },
+  {
+   "iata": "MF",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "샤먼항공",
+   "domestic": false,
+   "aliases": [
+    "샤먼항공",
+    "MF"
+   ]
+  },
+  {
+   "iata": "MH",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "말레이시아 항공",
+   "domestic": false,
+   "aliases": [
+    "말레이시아 항공",
+    "말레이시아항공",
+    "MH"
+   ]
+  },
+  {
+   "iata": "MM",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "피치항공",
+   "domestic": false,
+   "aliases": [
+    "피치항공",
+    "MM"
+   ]
+  },
+  {
+   "iata": "MS",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "이집트항공",
+   "domestic": false,
+   "aliases": [
+    "이집트항공",
+    "MS"
+   ]
+  },
+  {
+   "iata": "MU",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "중국동방항공",
+   "domestic": false,
+   "aliases": [
+    "중국동방항공",
+    "MU"
+   ]
+  },
+  {
+   "iata": "NH",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "전일본공수",
+   "domestic": false,
+   "aliases": [
+    "전일본공수",
+    "NH"
+   ]
+  },
+  {
+   "iata": "NX",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에어마카오",
+   "domestic": false,
+   "aliases": [
+    "에어마카오",
+    "NX"
+   ]
+  },
+  {
+   "iata": "NZ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에어 뉴질랜드",
+   "domestic": false,
+   "aliases": [
+    "에어 뉴질랜드",
+    "에어뉴질랜드",
+    "NZ"
+   ]
+  },
+  {
+   "iata": "OD",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "바틱 에어 말레이시아",
+   "domestic": false,
+   "aliases": [
+    "바틱 에어 말레이시아",
+    "바틱에어말레이시아",
+    "OD"
+   ]
+  },
+  {
+   "iata": "OM",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "몽골항공",
+   "domestic": false,
+   "aliases": [
+    "몽골항공",
+    "OM"
+   ]
+  },
+  {
+   "iata": "PR",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "필리핀항공",
+   "domestic": false,
+   "aliases": [
+    "필리핀항공",
+    "PR"
+   ]
+  },
+  {
+   "iata": "QF",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "콴타스항공",
+   "domestic": false,
+   "aliases": [
+    "콴타스항공",
+    "QF"
+   ]
+  },
+  {
+   "iata": "QR",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "카타르항공",
+   "domestic": false,
+   "aliases": [
+    "카타르항공",
+    "QR"
+   ]
+  },
+  {
+   "iata": "QV",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "라오항공",
+   "domestic": false,
+   "aliases": [
+    "라오항공",
+    "QV"
+   ]
+  },
+  {
+   "iata": "QW",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "청도항공",
+   "domestic": false,
+   "aliases": [
+    "청도항공",
+    "QW"
+   ]
+  },
+  {
+   "iata": "RJ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "로얄 요르단 항공",
+   "domestic": false,
+   "aliases": [
+    "로얄 요르단 항공",
+    "로얄요르단항공",
+    "RJ"
+   ]
+  },
+  {
+   "iata": "SC",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "산동항공",
+   "domestic": false,
+   "aliases": [
+    "산동항공",
+    "SC"
+   ]
+  },
+  {
+   "iata": "SK",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "스칸디나비아항공",
+   "domestic": false,
+   "aliases": [
+    "스칸디나비아항공",
+    "SK"
+   ]
+  },
+  {
+   "iata": "SQ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "싱가포르항공",
+   "domestic": false,
+   "aliases": [
+    "싱가포르항공",
+    "SQ"
+   ]
+  },
+  {
+   "iata": "SV",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "사우디아항공",
+   "domestic": false,
+   "aliases": [
+    "사우디아항공",
+    "SV"
+   ]
+  },
+  {
+   "iata": "T5",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "투르크메니스탄",
+   "domestic": false,
+   "aliases": [
+    "투르크메니스탄",
+    "T5"
+   ]
+  },
+  {
+   "iata": "TG",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "타이항공",
+   "domestic": false,
+   "aliases": [
+    "타이항공",
+    "TG"
+   ]
+  },
+  {
+   "iata": "TK",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "터키항공",
+   "domestic": false,
+   "aliases": [
+    "터키항공",
+    "TK"
+   ]
+  },
+  {
+   "iata": "TN",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에어 타히티 누이",
+   "domestic": false,
+   "aliases": [
+    "에어 타히티 누이",
+    "에어타히티누이",
+    "TN"
+   ]
+  },
+  {
+   "iata": "TP",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "TAP포르투갈 항공",
+   "domestic": false,
+   "aliases": [
+    "TAP포르투갈 항공",
+    "TAP포르투갈항공",
+    "TP"
+   ]
+  },
+  {
+   "iata": "TR",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "스쿠트 항공",
+   "domestic": false,
+   "aliases": [
+    "스쿠트 항공",
+    "스쿠트항공",
+    "TR"
+   ]
+  },
+  {
+   "iata": "UA",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "유나이티드항공",
+   "domestic": false,
+   "aliases": [
+    "유나이티드항공",
+    "UA"
+   ]
+  },
+  {
+   "iata": "UL",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "스리랑카항공",
+   "domestic": false,
+   "aliases": [
+    "스리랑카항공",
+    "UL"
+   ]
+  },
+  {
+   "iata": "UO",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "홍콩익스프레스",
+   "domestic": false,
+   "aliases": [
+    "홍콩익스프레스",
+    "UO"
+   ]
+  },
+  {
+   "iata": "UX",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "에어 유로파",
+   "domestic": false,
+   "aliases": [
+    "에어 유로파",
+    "에어유로파",
+    "UX"
+   ]
+  },
+  {
+   "iata": "VA",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "버진 오스트레일리아",
+   "domestic": false,
+   "aliases": [
+    "버진 오스트레일리아",
+    "버진오스트레일리아",
+    "VA"
+   ]
+  },
+  {
+   "iata": "VJ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "비엣젯항공",
+   "domestic": false,
+   "aliases": [
+    "비엣젯항공",
+    "VJ"
+   ]
+  },
+  {
+   "iata": "VN",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "베트남항공",
+   "domestic": false,
+   "aliases": [
+    "베트남항공",
+    "VN"
+   ]
+  },
+  {
+   "iata": "VS",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "버진 애틀랜틱 항공",
+   "domestic": false,
+   "aliases": [
+    "버진 애틀랜틱 항공",
+    "버진애틀랜틱항공",
+    "VS"
+   ]
+  },
+  {
+   "iata": "VZ",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "타이비엣젯항공",
+   "domestic": false,
+   "aliases": [
+    "타이비엣젯항공",
+    "VZ"
+   ]
+  },
+  {
+   "iata": "WB",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "르완다에어",
+   "domestic": false,
+   "aliases": [
+    "르완다에어",
+    "WB"
+   ]
+  },
+  {
+   "iata": "WS",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "웨스트젯",
+   "domestic": false,
+   "aliases": [
+    "웨스트젯",
+    "WS"
+   ]
+  },
+  {
+   "iata": "WY",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "오만항공",
+   "domestic": false,
+   "aliases": [
+    "오만항공",
+    "WY"
+   ]
+  },
+  {
+   "iata": "XY",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "플라이나스",
+   "domestic": false,
+   "aliases": [
+    "플라이나스",
+    "XY"
+   ]
+  },
+  {
+   "iata": "ZA",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "스카이 앙코르 항공",
+   "domestic": false,
+   "aliases": [
+    "스카이 앙코르 항공",
+    "스카이앙코르항공",
+    "ZA"
+   ]
+  },
+  {
+   "iata": "ZG",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "집에어",
+   "domestic": false,
+   "aliases": [
+    "집에어",
+    "ZG"
+   ]
+  },
+  {
+   "iata": "ZH",
+   "icao": null,
+   "tago_id": null,
+   "name_ko": "심천항공",
+   "domestic": false,
+   "aliases": [
+    "심천항공",
+    "ZH"
+   ]
+  }
+ ]
+}
