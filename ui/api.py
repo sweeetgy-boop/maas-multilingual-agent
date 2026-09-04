@@ -164,14 +164,17 @@ def run(text: str, session_id: str | None = None,
     orig = pipeline.tools.call_tool
     carried: list[str] = []
 
-    def patched(intent, slots):
+    def patched(intent, slots, **kw):
+        # **kw 로 받아 그대로 넘긴다. pipeline 이 call_tool 에 인자를
+        # 더해도(현재는 원문 text) 이 래퍼를 고치지 않아도 되게 한다.
         nonlocal carried
         merged, carried = merge_slots(slots, sess["slots"])
         if origin_coords:
             merged["origin_coords"] = origin_coords
         if destination_coords:
             merged["destination_coords"] = destination_coords
-        return orig(intent, merged, carried=carried)
+        kw.pop("carried", None)
+        return orig(intent, merged, carried=carried, **kw)
 
     pipeline.tools.call_tool = patched
     try:

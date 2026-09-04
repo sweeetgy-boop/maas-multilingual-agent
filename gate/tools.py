@@ -554,7 +554,10 @@ def _is_airport_status_query(raw_text: str | None, place: str | None) -> bool:
     return any(w.casefold() in t for w in _FLIGHT_STATUS_WORDS)
 
 
-_FLIGHT_NO_RE = re.compile(r"\b([A-Z]{2}|[0-9][A-Z]|[A-Z][0-9])\s?(\d{1,4})\b", re.I)
+# 편명은 관례상 대문자로 쓴다. 소문자까지 받으면 다른 언어의 흔한 낱말이
+# 항공사 코드로 잡힌다 — 인도네시아어 "ke Jeju" 의 ke 가 KE(대한항공)로
+# 오인식된 사례가 있었다. 대소문자를 가린다.
+_FLIGHT_NO_RE = re.compile(r"\b([A-Z]{2}|[0-9][A-Z]|[A-Z][0-9])\s?(\d{1,4})\b")
 
 
 def _flight_no_in(raw_text: str | None) -> str | None:

@@ -23,12 +23,12 @@
     "id": "ko-002",
     "lang": "ko",
     "category": "simple",
-    "text": "인천공항에서 제주 가는 항공편 내일 아침에 뭐 있어?",
+    "text": "김포공항에서 제주 가는 항공편 내일 아침에 뭐 있어?",
     "expected": {
       "in_domain": true,
       "intent": "search_flight",
       "slots": {
-        "origin": "인천공항",
+        "origin": "김포공항",
         "destination": "제주",
         "datetime": "내일 아침",
         "pax": null
@@ -626,12 +626,12 @@
     "id": "en-002",
     "lang": "en",
     "category": "simple",
-    "text": "What flights go from Incheon to Jeju tomorrow morning?",
+    "text": "What flights go from Gimpo to Jeju tomorrow morning?",
     "expected": {
       "in_domain": true,
       "intent": "search_flight",
       "slots": {
-        "origin": "Incheon",
+        "origin": "Gimpo",
         "destination": "Jeju",
         "datetime": "tomorrow morning",
         "pax": null
@@ -1231,12 +1231,12 @@
     "id": "id-002",
     "lang": "id",
     "category": "simple",
-    "text": "Ada penerbangan apa saja dari Incheon ke Jeju besok pagi?",
+    "text": "Ada penerbangan apa saja dari Gimpo ke Jeju besok pagi?",
     "expected": {
       "in_domain": true,
       "intent": "search_flight",
       "slots": {
-        "origin": "Incheon",
+        "origin": "Gimpo",
         "destination": "Jeju",
         "datetime": "besok pagi",
         "pax": null
@@ -1836,12 +1836,12 @@
     "id": "zh-002",
     "lang": "zh",
     "category": "simple",
-    "text": "仁川机场到济州岛明天早上的航班",
+    "text": "金浦机场到济州岛明天早上的航班",
     "expected": {
       "in_domain": true,
       "intent": "search_flight",
       "slots": {
-        "origin": "인천공항",
+        "origin": "김포공항",
         "destination": "제주",
         "datetime": "내일 아침",
         "pax": null
@@ -2198,12 +2198,12 @@
     "id": "ja-002",
     "lang": "ja",
     "category": "simple",
-    "text": "仁川空港から済州島への明日の朝の便",
+    "text": "金浦空港から済州島への明日の朝の便",
     "expected": {
       "in_domain": true,
       "intent": "search_flight",
       "slots": {
-        "origin": "인천공항",
+        "origin": "김포공항",
         "destination": "제주",
         "datetime": "내일 아침",
         "pax": null

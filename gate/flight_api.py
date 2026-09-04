@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import time
 from datetime import date, datetime, timedelta
@@ -140,20 +141,26 @@ def resolve_airline(text: str | None) -> dict | None:
     """원문에서 항공사를 찾는다. 게이트가 항공사를 슬롯으로 뽑지 않으므로
     (제약 3 — 게이트 스키마를 건드리지 않는다) 도구가 원문을 보고 맞춘다.
 
-    별칭이 원문에 들어 있는지만 본다. 가장 긴 별칭이 걸린 항공사를 고른다
-    — "에어부산"이 "에어"보다 구체적이다."""
+    이름 별칭은 대소문자를 무시하고 부분 일치로 본다.
+    **두세 글자 ASCII 코드(IATA/ICAO)는 대문자로 쓰인 경우에만 인정한다.**
+    소문자까지 받으면 다른 언어의 흔한 낱말에 걸린다 — 인도네시아어
+    "Gimpo **ke** Jeju"(제주 **로**)의 ke 가 대한항공(KE)으로 잡혀 질의가
+    대한항공 편만 남는 일이 실제로 있었다. 항공사 코드는 관례상 대문자로
+    쓰므로 대문자 조건이 표현력을 깎지 않는다.
+
+    여러 개가 걸리면 가장 긴 별칭이 걸린 항공사를 고른다 —
+    "에어부산"이 "에어"보다 구체적이다."""
     if not text:
         return None
-    t = text.casefold()
+    low = text.casefold()
+    words = set(re.findall(r"[A-Za-z0-9]+", text))          # 대소문자 그대로
     best, best_len = None, 0
     for a in _load()["airlines"]:
         for al in a["aliases"]:
-            # 두 글자 IATA 코드는 우연히 걸리기 쉽다("KE"가 "KEY"에).
-            # 코드는 단어 경계가 맞을 때만 인정하고, 이름은 부분 일치로 본다.
             if len(al) <= 3 and al.isascii():
-                hit = al.casefold() in t.split() or f" {al.casefold()} " in f" {t} "
+                hit = al.isupper() and al in words
             else:
-                hit = al.casefold() in t
+                hit = al.casefold() in low
             if hit and len(al) > best_len:
                 best, best_len = a, len(al)
     return best

@@ -74,10 +74,12 @@ def chat(req: ChatIn):
     orig_call_tool = pipeline.tools.call_tool
     carried: list[str] = []
 
-    def patched_call_tool(intent, slots):
+    def patched_call_tool(intent, slots, **kw):
+        # **kw 로 받아 그대로 넘긴다. pipeline 이 call_tool 에 인자를
+        # 더해도(현재는 원문 text) 이 래퍼를 고치지 않아도 되게 한다.
         nonlocal carried
         merged, carried = merge_slots(slots, sess["last_slots"])
-        return orig_call_tool(intent, merged)
+        return orig_call_tool(intent, merged, **kw)
 
     pipeline.tools.call_tool = patched_call_tool
     try:
