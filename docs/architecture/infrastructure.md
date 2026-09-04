@@ -28,7 +28,7 @@ flowchart TD
     MaasUi --> Gate
     Gate --> VLLM
 
-    Bedrock["AWS Bedrock Runtime<br/>Claude Haiku (Supervisor)<br/>Guardrails b53a6caaqa31 (Standard, apac)"]
+    Bedrock["AWS Bedrock Runtime<br/>Claude Haiku (Supervisor)<br/>Guardrails 671i24gxu4oo (Standard, apac)"]
     Gate --> Bedrock
 
     subgraph external["외부 API"]

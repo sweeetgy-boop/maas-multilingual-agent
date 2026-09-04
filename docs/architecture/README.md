@@ -14,6 +14,7 @@
 | [cicd.md](cicd.md) | CI/CD 파이프라인 — GitHub → CodePipeline → CodeBuild → CodeDeploy |
 | [request-flow.md](request-flow.md) | 요청 처리 흐름 — 방어 계층 6종과 차단 분기 |
 | [ec2-internals.md](ec2-internals.md) | EC2 내부 — 포트·프로세스·systemd·Docker·디렉터리 구조 |
+| [security.md](security.md) | 보안 아키텍처 — IAM 권한 분리, 네트워크 노출, 시크릿, 알려진 위험 |
 
 운영 절차(시작/정지, 배포, 인증서, 장애 진단, 종료 체크리스트)는
 [operations.md](operations.md) 참고.
@@ -30,11 +31,16 @@
 | 보안그룹 | `sg-0ce81d06ebaf0db08` (`maas-llm-sg`) | 인바운드 방화벽 |
 
 **보안그룹 인바운드**: `80/tcp`, `443/tcp`는 `0.0.0.0/0`로 공개. 이 외에
-`3000/tcp`, `7000/tcp`가 각각 특정 단일 IP 1개로 제한돼 열려 있는데(개인
-접근용으로 추정, 실제로 리스닝 중인 서비스는 3000뿐이고 7000은 현재
-아무것도 안 듣고 있다), 이 문서에는 출발지 IP를 적지 않았다 — 더 이상
-필요 없으면 정리를 권장한다. `8080`(`maas-api`), `7860`(`maas-ui`)은 EC2
-안에서만 접근 가능하고 보안그룹에 규칙이 없다(Caddy만 경유).
+`3000/tcp`와 `7000-9000/tcp`가 각각 특정 단일 IP 1개로 제한돼 열려 있다(개인
+접근용으로 추정). 이 문서에는 출발지 IP를 적지 않았다 — 더 이상 필요 없으면
+정리를 권장한다.
+
+> **`7000-9000` 범위가 `8080`(`maas-api`)과 `7860`(`maas-ui`)을 포함한다.**
+> 두 프로세스는 `0.0.0.0`에 바인딩돼 있어, 그 출발지 IP 하나에서는 Caddy를
+> 거치지 않고 평문 HTTP로 직접 접근할 수 있다. 인터넷 전체에는 닫혀 있지만
+> "EC2 안에서만 접근 가능"은 아니다. `8000`(vLLM)도 범위 안이지만 Docker
+> 포트 매핑이 `127.0.0.1`이라 도달하지 않는다. 자세한 내용은
+> [security.md](security.md#2-네트워크-노출).
 
 ### EC2
 
@@ -70,7 +76,7 @@
 | 서비스 | 값 | 용도 |
 |---|---|---|
 | Bedrock Runtime | `anthropic.claude-3-haiku-20240307-v1:0` | Supervisor(답변 생성) |
-| Bedrock Guardrails | `b53a6caaqa31` v1 (Standard tier, apac cross-region) | 입력·출력 콘텐츠 검사 |
+| Bedrock Guardrails | `671i24gxu4oo` v1 — `maas-transit-guardrail-v3` (Standard tier, apac cross-region) | 입력·출력 콘텐츠 검사 |
 | S3 | 위 두 버킷 | 배포 아티팩트 |
 | SSM | Session Manager, Run Command | 원격 접속·운영 명령 |
 | CloudWatch Logs | CodeBuild 빌드 로그 | 빌드 실패 진단 |
@@ -99,8 +105,13 @@
 
 ## 환경변수 목록
 
-값은 EC2의 systemd 유닛 파일(`/etc/systemd/system/maas-api.service` 등)에
-`Environment=`로만 존재한다. 이 저장소 어디에도 실제 값을 넣지 않는다.
+값은 EC2에만 존재하고 이 저장소 어디에도 넣지 않는다. 외부 API 키
+(`SEOUL_OPEN_API_KEY`, `KAKAO_REST_API_KEY`, `DATA_GO_KR_KEY_ENC`,
+`KRIC_SERVICE_KEY`)는 `/etc/maas-api.env`(권한 600, root 소유)에 있고 systemd
+유닛이 `EnvironmentFile=`로 읽는다. 나머지는 유닛 파일의 `Environment=`에
+남아 있다 — `MAAS_API_KEY`가 여기 포함되는데 유닛 파일 권한이 644라
+[security.md](security.md#43-그런데-maas_api_key-는-옮겨지지-않았다)에
+위험으로 적어 두었다.
 
 | 변수 | 용도 |
 |---|---|
@@ -134,7 +145,7 @@ OpenAI 호환 경로는 GuardBench 연동용이다. **인증이 없다** — Gua
 담당 계층은 `x_maas.blocked_by` 로 나간다. 스트리밍은 지원하지 않는다
 (근거성 검증이 끝나야 최종 응답이 정해지므로 토큰을 흘려보낼 수 없다).
 `system` 메시지는 Supervisor 프롬프트 보호를 위해 무시한다.
-자세한 내용은 [../../README.md](../../README.md#openai-호환-엔드포인트).
+자세한 내용은 [../../README.md](../../README.md#openai-호환-경로).
 
 ## 알려진 제약
 
