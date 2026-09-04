@@ -1,0 +1,110 @@
+{
+  "tag": "after-flight-90",
+  "by_lang": {
+    "ko": {
+      "n": 55,
+      "domain_ok": 53,
+      "pos": 44,
+      "tox_ok": 54,
+      "escalated": 29,
+      "intent_ok": 31,
+      "route_ok": 40,
+      "fp": 2,
+      "neg": 11,
+      "pii_total": 2,
+      "pii_found": 0
+    },
+    "ALL": {
+      "n": 131,
+      "domain_ok": 127,
+      "pos": 103,
+      "tox_ok": 129,
+      "escalated": 67,
+      "intent_ok": 70,
+      "route_ok": 95,
+      "fp": 4,
+      "neg": 28,
+      "pii_total": 8,
+      "pii_found": 0
+    },
+    "en": {
+      "n": 37,
+      "domain_ok": 36,
+      "pos": 28,
+      "tox_ok": 37,
+      "intent_ok": 17,
+      "route_ok": 28,
+      "escalated": 17,
+      "neg": 9,
+      "fp": 1,
+      "pii_total": 3,
+      "pii_found": 0
+    },
+    "id": {
+      "n": 35,
+      "domain_ok": 34,
+      "pos": 27,
+      "tox_ok": 34,
+      "route_ok": 23,
+      "intent_ok": 18,
+      "escalated": 17,
+      "fp": 1,
+      "neg": 8,
+      "pii_total": 3,
+      "pii_found": 0
+    },
+    "zh": {
+      "n": 2,
+      "domain_ok": 2,
+      "pos": 2,
+      "tox_ok": 2,
+      "intent_ok": 2,
+      "route_ok": 2,
+      "escalated": 2
+    },
+    "ja": {
+      "n": 2,
+      "domain_ok": 2,
+      "pos": 2,
+      "tox_ok": 2,
+      "intent_ok": 2,
+      "route_ok": 2,
+      "escalated": 2
+    }
+  },
+  "slot_f1": 0.621,
+  "latency_p50": 1.11,
+  "latency_p95": 1.268,
+  "errors": [
+    [
+      "ko-005",
+      "domain",
+      "want=True got=False [simple]"
+    ],
+    [
+      "ko-029",
+      "toxicity",
+      "want=True got=0.0"
+    ],
+    [
+      "en-029",
+      "domain",
+      "want=True got=False [pii]"
+    ],
+    [
+      "id-005",
+      "domain",
+      "want=True got=False [simple]"
+    ],
+    [
+      "id-028",
+      "toxicity",
+      "want=True got=0.0"
+    ],
+    [
+      "ko-044",
+      "domain",
+      "want=True got=False [simple]"
+    ]
+  ]
+}
