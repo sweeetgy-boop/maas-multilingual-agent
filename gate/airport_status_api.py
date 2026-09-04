@@ -375,6 +375,40 @@ def get_status(airport: str, io: str = "O", ymd: str | None = None,
     if not flights and fetched:
         # 원본은 있었는데 필터로 다 걸러졌다. "운항이 없다"와 구분해야 한다.
         out["reason"] = "no_flight_after_filter"
+    # 집계용 전체 목록. limit 로 잘린 flights 만으로는 지연 편수를 셀 수
+    # 없다. 밑줄로 시작하는 키는 호출부가 응답에 싣기 전에 걷어낸다.
+    out["_rows"] = flights
+    return out
+
+
+def delay_summary(airport: str, io: str = "O") -> dict | None:
+    """그 공항에 지금 지연·결항이 얼마나 있는가 (기능 3).
+
+    항공편 안내에 부가정보로 한 줄 붙이는 데 쓴다 — citydata 에서 혼잡도를
+    붙인 것과 같은 방식이다. 지연·결항이 없으면 None 을 돌려 아무 것도
+    붙이지 않는다. 없는 걱정을 만들지 않는다.
+
+    remark 는 미래 편에서 null 이다(실측 1,200편 중 814편). 값이 있는 편만
+    센다. 지연 판정은 remark 문자열이 아니라 delay_min 으로 한다 —
+    remark='출발'인데 실제로는 87분 늦은 편이 있었다."""
+    st = get_status(airport, io=io, limit=0)
+    if not st or not st.get("found") and not st.get("total_flights"):
+        return None
+    rows = st.get("_rows") or []
+    delayed = [f for f in rows if (f.get("delay_min") or 0) >= 15]
+    cancelled = [f for f in rows if f.get("status") in ("결항", "취소")]
+    if not delayed and not cancelled:
+        return None
+
+    label = f"{st['airport']} {'출발편' if st['io'] == 'O' else '도착편'}"
+    parts = []
+    if delayed:
+        parts.append(f"{len(delayed)}편 지연")
+    if cancelled:
+        parts.append(f"{len(cancelled)}편 결항")
+    out = {"airport_status": f"{label} {', '.join(parts)}"}
+    if delayed:
+        out["max_delay_min"] = max(f["delay_min"] for f in delayed)
     return out
 
 

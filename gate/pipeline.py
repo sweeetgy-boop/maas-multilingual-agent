@@ -246,6 +246,11 @@ def call_gate(text: str) -> dict:
 
 # ─────────────────────────────────────────────────────────
 # ⑤ Supervisor
+# found=false 지만 사용자에게 전할 말이 실려 있어 Supervisor 로 넘기는 이유들.
+# 그 외의 found=false 는 일반 NOT_FOUND 문구로 조기 반환한다.
+SUPERVISED_EMPTY_REASONS = frozenset(
+    {"location_not_covered", "flight_not_found"} | set(tools._FLIGHT_GUIDED_REASONS))
+
 SUPERVISOR_SYSTEM = """You are a multilingual public transit assistant for Korea.
 
 NEVER LEAK INTERNALS (read this before anything else)
@@ -321,7 +326,24 @@ CRITICAL RULES
    sentence, placed immediately before the disclaimer line. Never add it to a
    Korean answer, to a refusal or out-of-scope answer, or to a found=false /
    location_not_covered / error answer — those have no names worth keeping.
-14. time_filter_note is governed by the SAY THIS FIRST block above."""
+14. time_filter_note is governed by the SAY THIS FIRST block above.
+15. FLIGHTS. If TOOL_RESULT has gate, terminal or checkin, state them plainly.
+   For Incheon the terminal matters: a passenger who goes to the wrong terminal
+   needs a 20-minute shuttle, so mention the terminal whenever it is present.
+   Never guess a gate, terminal or check-in counter that is not in TOOL_RESULT.
+   If TOOL_RESULT has fare_coverage_note, relay it in one short clause. It
+   explains why some flights show a fare and others do not. It does NOT mean you
+   should hide the fares that ARE present — state those exactly as given.
+   If TOOL_RESULT has a "note" field, relay it. With alternative_airport it means
+   the route does not operate on that date but another airport does; say so
+   instead of a bare "not found". You were given no flights from that other
+   airport — name the airport, never invent a departure from it.
+16. KEEP FLIGHT ANSWERS TO 3 SENTENCES OR FEWER.
+   Live status question: lead with status, delay and gate/terminal.
+   Timetable question: lead with times and fares, then AT MOST ONE extra detail
+   (choose one of access_note, context, fare_coverage_note — never several).
+   Rule 10 still caps context at one short line; do not also add access_note
+   when you have used it."""
 
 
 # 커버리지 밖 응답 전용 프롬프트.
@@ -463,11 +485,11 @@ def handle(text: str, verbose: bool = False) -> dict:
             return {"route": "blocked", "reason": f"no_tool:{intent}", "lang": lang,
                     "answer": REFUSAL[lang], "trace": trace,
                     "total_ms": round((time.perf_counter() - t0) * 1000)}
-    tr = tools.call_tool(intent, slots)
+    tr = tools.call_tool(intent, slots, text=text)
     trace["tool"] = intent
     trace["tool_found"] = tr.get("found")
 
-    if not tr.get("found") and tr.get("reason") != "location_not_covered":
+    if not tr.get("found") and tr.get("reason") not in SUPERVISED_EMPTY_REASONS:
         return {"route": "tool_empty", "reason": tr.get("reason"), "lang": lang,
                 "answer": NOT_FOUND[lang], "trace": trace,
                 "total_ms": round((time.perf_counter() - t0) * 1000)}
@@ -475,6 +497,10 @@ def handle(text: str, verbose: bool = False) -> dict:
     # location_not_covered 는 found=false 지만 Supervisor 로 넘겨 service_note 를
     # 사용자 언어로 안내하게 한다 (전용 프롬프트 COVERAGE_SYSTEM) — 여기서 일반
     # NOT_FOUND 문구로 조기 반환하면 서비스 커버리지 안내가 나가지 않는다.
+    #
+    # 항공의 no_route 도 같은 사정이다. "인천에서 제주"는 노선이 없지만
+    # 김포라는 확인된 대안이 있다. 일반 NOT_FOUND 로 끊으면 그 안내가
+    # 사라지고, 사용자는 왜 안 되는지도 모른 채 돌아간다.
 
     # ⑤ Supervisor
     answer = call_supervisor(masked, tr, lang)

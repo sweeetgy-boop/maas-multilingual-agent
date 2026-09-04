@@ -13,10 +13,13 @@ Supervisor 프롬프트를 고칠 필요가 없다.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 
+import airport_status_api
 import citydata_api
 import expbus_api
+import flight_api
 import korail_api
 import odsay_api
 import subway_stations
@@ -513,6 +516,117 @@ def search_bus(origin=None, destination=None, datetime_hint=None, pax=None, carr
                    "origin": o["name"], "destination": d["name"]}, "TAGO 버스 API (mock)")
 
 
+# ── 항공 ────────────────────────────────────────────────
+# "지금 지연되나요" 류를 search_flight 로 보내는 경우가 있다. 게이트가
+# 어느 intent 로 보내는지는 모델에 달려 있으므로 양쪽 도구가 모두 이
+# 질의를 받아낼 수 있게 한다 — 코레일·KRIC 에서 쓴 방법과 같고,
+# 게이트 프롬프트나 스키마는 건드리지 않는다(제약 3).
+_FLIGHT_STATUS_WORDS = (
+    "지연", "연착", "결항", "취소", "탑승구", "게이트", "터미널", "체크인",
+    "카운터", "지금", "실시간", "현재", "운항 상태", "운항상태", "도착했",
+    "delay", "delayed", "cancel", "gate", "terminal", "check-in", "checkin",
+    "right now", "real-time", "realtime", "status", "on time",
+    "延误", "误点", "取消", "登机口", "航站楼", "值机", "现在", "实时", "状态",
+    "遅延", "遅れ", "欠航", "搭乗口", "ターミナル", "チェックイン", "今", "リアルタイム",
+    "terlambat", "delay", "dibatalkan", "gerbang", "terminal", "sekarang",
+)
+
+# 항공편 상태를 물은 것이 아니라 그 공항의 지하철·도시철도를 물은 경우.
+# 김포공항은 서울 121장소이자 지하철역이라 두 질의가 겹친다.
+_METRO_AT_AIRPORT_WORDS = ("지하철", "전철", "역", "subway", "metro", "station",
+                           "地铁", "车站", "地下鉄", "駅", "kereta", "stasiun")
+
+
+def _is_airport_status_query(raw_text: str | None, place: str | None) -> bool:
+    """이 질의가 "그 공항 지금 어때?" 인가.
+
+    공항으로 해소되는 지명 하나만 있고, 상태를 묻는 낱말이 원문에 있으면
+    실시간 운항현황으로 넘긴다. 지하철·역을 명시하면 넘기지 않는다 —
+    김포공항은 서울 121장소이자 지하철역이라 두 질의가 겹친다."""
+    if not place or not flight_api.resolve_airport(place):
+        return False
+    t = (raw_text or place).casefold()
+    if any(w.casefold() in t for w in _METRO_AT_AIRPORT_WORDS):
+        # "김포공항역"처럼 역명으로 부른 경우는 지하철 질의다. 다만 편명이
+        # 함께 있으면("인천공항 KE001 탑승구") 항공편 질의가 분명하다.
+        if not _flight_no_in(raw_text):
+            return False
+    return any(w.casefold() in t for w in _FLIGHT_STATUS_WORDS)
+
+
+_FLIGHT_NO_RE = re.compile(r"\b([A-Z]{2}|[0-9][A-Z]|[A-Z][0-9])\s?(\d{1,4})\b", re.I)
+
+
+def _flight_no_in(raw_text: str | None) -> str | None:
+    """원문에서 편명을 뽑는다 ("인천공항 KE001 탑승구 어디야?" → KE001).
+
+    편명이 있으면 코드셰어 Slave 도 남겨야 한다(기능 8) — 사용자가 가진
+    항공권의 편명일 수 있다."""
+    if not raw_text:
+        return None
+    for m in _FLIGHT_NO_RE.finditer(raw_text):
+        code = m.group(1).upper()
+        # 항공사 코드로 실재하는 것만 인정한다. "A1 출구" 같은 것을
+        # 편명으로 읽지 않기 위해서다.
+        if any(a.get("iata") == code for a in flight_api._load()["airlines"]):
+            return f"{code}{m.group(2)}"
+    return None
+
+
+def _add_flight_context(result: dict, iata: str | None, io: str = "O") -> None:
+    """기능 3 — 출발 공항에 지연·결항이 있으면 부가정보로 붙인다.
+    citydata 에서 혼잡도·사고통제를 붙인 것과 같은 방식이고, Supervisor
+    규칙 10 이 이미 context 를 한 줄 언급하도록 되어 있어 그대로 재사용한다.
+
+    지연·결항이 없으면 아무 것도 붙이지 않는다 — 없는 걱정을 만들지 않는다."""
+    if not iata:
+        return
+    ctx = airport_status_api.delay_summary(iata, io=io)
+    if ctx:
+        result.setdefault("context", {}).update(ctx)
+
+
+# found=false 지만 사용자에게 전할 말이 있는 경우. pipeline 이 이 이유들을
+# 일반 NOT_FOUND 로 조기 반환하지 않고 Supervisor 로 넘긴다 —
+# location_not_covered 를 COVERAGE_SYSTEM 으로 넘기는 것과 같은 이유다.
+_FLIGHT_GUIDED_REASONS = frozenset({"no_route", "beyond_schedule"})
+
+
+def _flight_result_from_api(real: dict, pax: int | None) -> dict:
+    """flight_api.search 결과를 도구 반환 스키마로 옮긴다.
+
+    기존 필드(flight_no/departure/duration_min/fare_krw)는 그대로 두고
+    새 정보는 선택적 필드로만 보탠다(제약 2).
+
+    **운임은 1인 기준 그대로 싣는다.** 목 데이터는 pax 를 곱했지만 실제
+    운임은 API 가 준 값이라, 인원수를 곱하면 받은 적 없는 금액을 만들게
+    된다(제약 6). 좌석별 운임을 그대로 보여주는 편이 정확하다."""
+    flights = []
+    for f in real.get("flights", []):
+        row = {"flight_no": f.get("flight_no"),
+               "departure": f.get("departure")}
+        for k in ("arrival", "duration_min", "airline",
+                  "fare_krw", "fare_prestige_krw"):
+            if f.get(k) is not None:
+                row[k] = f[k]
+        flights.append(row)
+
+    out = {"found": True,
+           "origin": real["dep_airport"], "destination": real["arr_airport"],
+           "pax": pax or 1, "flights": flights}
+    for k in ("total_flights", "fare_krw_range", "fare_by_airline",
+              "airline_filter", "access_note"):
+        if real.get(k) is not None:
+            out[k] = real[k]
+    # 운임 보유율이 22.8% 라 "요금이 안 나온 편"이 흔하다. 왜 그런지
+    # 한 줄로 알린다. 코레일의 fare_note 와 이름을 겹치지 않게 한다 —
+    # Supervisor 규칙 12 의 fare_note 는 "요금을 말하지 말라"는 뜻이라
+    # 같은 이름을 쓰면 실제 운임이 있는데도 침묵하게 된다.
+    if real.get("fare_note"):
+        out["fare_coverage_note"] = real["fare_note"]
+    return out
+
+
 FLIGHT_TABLE = {
     ("ICN", "CJU"): [("KE1201", 70, 89000), ("OZ8905", 75, 82000), ("7C101", 70, 54000)],
     ("GMP", "CJU"): [("KE1231", 65, 78000), ("LJ301", 70, 49000)],
@@ -520,7 +634,63 @@ FLIGHT_TABLE = {
 }
 
 
-def search_flight(origin=None, destination=None, datetime_hint=None, pax=None, **_) -> dict:
+def search_flight(origin=None, destination=None, datetime_hint=None, pax=None,
+                  carried=(), raw_text=None, **_) -> dict:
+    """국내선 시간표·운임. TAGO 국내항공운항정보 실데이터를 먼저 쓰고,
+    실패하거나 키가 없으면 목 데이터로 폴백한다(제약 5).
+
+    항공은 전국 서비스라 location_not_covered 가 맞지 않는다 — 서울 전용
+    도구들과 다른 점이다."""
+    # "김포공항 지금 지연되나요?" 가 이 intent 로 오는 경우가 있다. 공항
+    # 하나만 가리키고 상태를 묻는 질의면 실시간 조회로 넘긴다. 그쪽이
+    # 이미 인천/그 외 공항 분기를 갖고 있어 여기서 되풀이할 이유가 없다.
+    lone = origin if (origin and not destination) else (
+        destination if (destination and not origin) else None)
+    if lone and _is_airport_status_query(raw_text, lone):
+        return get_realtime_status(origin=lone, carried=carried, raw_text=raw_text)
+
+    # ── 실데이터 ──
+    dep, arr = flight_api.resolve_airport(origin), flight_api.resolve_airport(destination)
+    if dep and arr:
+        ymd = _base_date(datetime_hint).strftime("%Y%m%d")
+        # 게이트가 뽑은 "내일 오후"를 출발 시각 범위로 옮겨 넘긴다.
+        # 파싱은 time_window() 한 곳에만 둔다 — 항공에서 따로 구현하면
+        # 한쪽만 고쳐 철도와 동작이 어긋난다.
+        window = time_window(datetime_hint)
+        real = flight_api.search(
+            origin, destination, ymd, airline=raw_text, limit=5,
+            after_hhmm=window[0] if window else None,
+            before_hhmm=window[1] if window else None)
+
+        # 그 시간대에 운항이 없으면 빈손으로 두지 않고 전체 시간표로
+        # 되돌리되, 요청한 시간대가 아니라는 사실을 함께 싣는다.
+        # 같은 조회라 캐시에 걸려 추가 호출 비용은 사실상 없다.
+        widened = False
+        if window and real is not None and not real.get("flights"):
+            wide = flight_api.search(origin, destination, ymd,
+                                     airline=raw_text, limit=5)
+            if wide and wide.get("flights"):
+                real, widened = wide, True
+
+        if real is not None and real.get("found"):
+            result = _flight_result_from_api(real, pax)
+            if widened:
+                result["time_filter_note"] = _TIME_FILTER_NOTE
+            _add_flight_context(result, real.get("dep_iata"))
+            _add_context(result, arr["name_ko"])
+            return _stamp(result, "국토교통부 국내항공운항정보 (공공데이터포털)")
+
+        # 노선이 없거나 시즌 밖이면 그 사실을 그대로 전한다. 목 데이터로
+        # 덮으면 "인천에서 제주" 에 없는 항공편을 만들어내게 된다.
+        if real is not None and real.get("reason") in _FLIGHT_GUIDED_REASONS:
+            return _stamp({k: v for k, v in real.items()
+                           if k in ("found", "reason", "note", "date",
+                                    "alternative_airport", "alternative_iata")}
+                          | {"origin": real["dep_airport"],
+                             "destination": real["arr_airport"]},
+                          "국토교통부 국내항공운항정보 (공공데이터포털)")
+
+    # ── 목 데이터 폴백 ──
     o, d = resolve_place(origin), resolve_place(destination)
     if not o or not d:
         return _unresolved(origin, o, destination, d, "한국공항공사 API (mock)")
@@ -655,8 +825,103 @@ def _rail_delay_status(station: str | None = None,
         f"당일 운행상황은 코레일 공식 채널에서 확인하세요.")
 
 
-def get_realtime_status(origin=None, destination=None, pax=None, carried=(), **_) -> dict:
+# 실시간 조회 실패 시 쓰는 항공 목 데이터. 한국공항공사 키가 열리기
+# 전까지 인천 외 공항이 여기로 온다. 항공은 전국 서비스라
+# location_not_covered 가 아니라 목 데이터 폴백이 맞다(제약 5).
+_FLIGHT_MOCK_LINES = [
+    {"line": "출발편", "status": "정상 운항"},
+    {"line": "도착편", "status": "정상 운항"},
+]
+
+
+def _pick_now(rows: list[dict], has_flight_no: bool, limit: int = 5) -> list[dict]:
+    """"지금 지연되나요?" 에 하루 첫 편부터 보여주면 답이 되지 않는다.
+    현재 시각 언저리(-1시간 ~ +3시간)로 좁히고, 그 안에서 지연·결항을
+    먼저 보여준다. 편명을 지정했으면 그 편이 하나뿐이므로 손대지 않는다.
+
+    시간대에 아무 것도 없으면(심야 등) 좁히기 전으로 되돌린다 — 빈손보다
+    하루 시간표라도 보여주는 편이 낫다."""
+    if has_flight_no or not rows:
+        return rows[:limit]
+    now = datetime.now()
+    lo, hi = now - timedelta(hours=1), now + timedelta(hours=3)
+
+    def when(f: dict) -> datetime | None:
+        try:
+            return datetime.strptime(f.get("scheduled") or "", "%Y-%m-%d %H:%M")
+        except ValueError:
+            return None
+
+    near = [f for f in rows if (w := when(f)) and lo <= w <= hi] or rows
+    # 지연·결항을 앞에 둔다. 그 다음은 예정 시각 순서다.
+    near.sort(key=lambda f: (not (f.get("delay_min") or
+                                  f.get("status") in ("결항", "취소")),
+                             f.get("scheduled") or ""))
+    return near[:limit]
+
+
+def _airport_status_result(anchor: str, raw_text: str | None) -> dict | None:
+    """공항 실시간 운항현황. 조회에 실패하면 목 데이터로 폴백한다.
+    공항으로 해소되지 않으면 None 을 돌려 원래 분기로 되돌린다."""
+    port = flight_api.resolve_airport(anchor)
+    if not port or not port.get("domestic"):
+        return None
+
+    flight_no = _flight_no_in(raw_text)
+    # 도착을 물었으면 도착편을, 아니면 출발편을 본다.
+    io = "I" if any(w in (raw_text or "") for w in
+                    ("도착", "arriv", "到达", "到着", "tiba")) else "O"
+    st = airport_status_api.get_status(port["iata"], io=io,
+                                       flight_no=flight_no, limit=5)
+
+    if st is None:
+        # 키 미등록·조회 실패. 실시간이 아니므로 is_realtime 을 달지 않는다 —
+        # 목 데이터를 실시간이라고 말하게 두면 안 된다.
+        return _stamp({"found": True, "airport": port["name_ko"],
+                       "lines": [dict(x) for x in _FLIGHT_MOCK_LINES]},
+                      "공항 운항정보 (mock)")
+
+    if not st.get("found"):
+        # 조회는 됐는데 그 편이 없다. 목 데이터로 덮으면 존재하지 않는
+        # 편명에 "정상 운항"이라고 답하게 된다 — 실측상 KE001 은 인천에
+        # 없는 편명인데도 그렇게 답했다. 없다고 말하는 편이 맞다.
+        out = {"found": False, "airport": port["name_ko"],
+               "reason": "flight_not_found" if flight_no else "no_flight_now"}
+        if flight_no:
+            out["flight_no"] = flight_no
+            out["note"] = f"{port['name_ko']}에서 {flight_no} 편을 찾지 못했습니다"
+        return _stamp(out, st["source"] + " (공공데이터포털)")
+
+    lines, flights = [], []
+    for f in _pick_now(st["_rows"], bool(flight_no)):
+        where = f.get("counterpart")
+        label = f"{f['flight_no']} {where}".strip() if where else f["flight_no"]
+        row = {"line": label}
+        if f.get("status"):
+            row["status"] = f["status"]
+        if f.get("delay_min"):
+            row["delay_min"] = f["delay_min"]
+        lines.append(row)
+        flights.append({k: v for k, v in f.items()
+                        if not k.startswith("_") and v is not None})
+
+    out = {"found": True, "airport": port["name_ko"],
+           "lines": lines, "flights": flights,
+           "is_realtime": True}
+    if st.get("total_flights"):
+        out["total_flights"] = st["total_flights"]
+    ctx = airport_status_api.delay_summary(port["iata"], io=io)
+    if ctx:
+        out["context"] = ctx
+    if port.get("access_note"):
+        out["access_note"] = port["access_note"]
+    return _stamp(out, st["source"] + " (공공데이터포털)")
+
+
+def get_realtime_status(origin=None, destination=None, pax=None, carried=(),
+                        raw_text=None, **_) -> dict:
     """분기 순서
+      0. 공항이고 항공편 상태를 물었다 → 공항 실시간 운항현황.
       1. 서울시 121장소 안 → 실시간 지하철 도착정보(citydata).
       2. 121장소 밖이지만 간선철도역 → 코레일 운행실적 기반 지연(전국 서비스).
       3. 그 외 지명 → 커버리지 밖임을 명시한다. 관계 없는 수도권 노선 목
@@ -666,6 +931,16 @@ def get_realtime_status(origin=None, destination=None, pax=None, carried=(), **_
     2번은 "실시간"이 아니다. 코레일 API 에는 당일·미래 데이터가 없어 최신
     실적일 기준이며, 그 사실은 _rail_delay_status 가 disclaimer 에 싣는다."""
     anchor = pick_anchor(origin, destination, carried)
+
+    # 0. 공항 실시간 운항현황. citydata 보다 먼저 본다 — 김포공항은 서울
+    #    121장소이자 지하철역이라 두 질의가 겹치는데, "김포공항 지금
+    #    지연되나요?" 는 항공편을 묻는 것이지 지하철 도착정보를 묻는 것이
+    #    아니다. 지하철·역을 명시하면 _is_airport_status_query 가 걸러낸다.
+    if anchor and _is_airport_status_query(raw_text, anchor):
+        flown = _airport_status_result(anchor, raw_text)
+        if flown is not None:
+            return flown
+
     area = citydata_api.resolve_area(anchor) if anchor else None
 
     if area:
@@ -908,7 +1183,7 @@ TOOL_MAP = {
 }
 
 
-def call_tool(intent: str, slots: dict, carried=()) -> dict:
+def call_tool(intent: str, slots: dict, carried=(), text: str | None = None) -> dict:
     """carried: 이번 턴 값이 아니라 직전 턴에서 승계된 슬롯 키 목록.
     "<장소> 근처 X" 류 도구가 기준점을 고를 때(pick_anchor) 승계된 슬롯을
     걸러내는 데 쓴다. 기본값 빈 튜플이라 이 인자를 안 넘기는 기존 호출부
@@ -916,11 +1191,17 @@ def call_tool(intent: str, slots: dict, carried=()) -> dict:
 
     origin_coords/destination_coords: 게이트를 우회해 도구로 직접 전달되는
     좌표(선택). 현재는 plan_journey 만 사용한다 — 다른 도구는 **_ 로
-    무시하므로 안전하게 항상 전달해도 된다."""
+    무시하므로 안전하게 항상 전달해도 된다.
+
+    text: 사용자 원문(선택). 게이트가 슬롯으로 뽑지 않는 정보를 도구가
+    직접 읽는 데 쓴다 — 항공사 이름(기능 9)과 편명이 그렇다. 게이트
+    스키마에 슬롯을 더하면 xgrammar 제약이 늘어 의도 정확도가 더
+    떨어지므로, 스키마는 그대로 두고 원문을 넘긴다(제약 3)."""
     fn = TOOL_MAP.get(intent)
     if fn is None:
         return {"found": False, "reason": "no_tool_for_intent", "intent": intent}
     return fn(origin=slots.get("origin"), destination=slots.get("destination"),
               datetime_hint=slots.get("datetime"), pax=slots.get("pax"), carried=carried,
               origin_coords=slots.get("origin_coords"),
-              destination_coords=slots.get("destination_coords"))
+              destination_coords=slots.get("destination_coords"),
+              raw_text=text or slots.get("text"))
