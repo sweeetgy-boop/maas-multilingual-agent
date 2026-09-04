@@ -34,6 +34,7 @@ import re
 import sys
 import time
 import unicodedata
+from pathlib import Path
 
 import boto3
 import httpx
@@ -424,6 +425,112 @@ def verify(answer: str, tool_result: dict) -> tuple[bool, list[str]]:
 
 # ─────────────────────────────────────────────────────────
 # ⑦ Guardrail
+def _place_names() -> set[str]:
+    """우리 캐시가 아는 지명 전부(공항·항공사·철도역). 가드레일이 지명을
+    사람 이름으로 오탐했는지 가리는 데 쓴다. 한 번만 만들고 재사용한다."""
+    global _PLACE_NAMES
+    if _PLACE_NAMES is None:
+        names: set[str] = set()
+        for path, keys in ((Path(__file__).with_name("airports.json"),
+                            ("airports", "airlines")),):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            for key in keys:
+                for row in data.get(key) or []:
+                    for a in row.get("aliases") or []:
+                        names.add(a)
+                    for k in ("name_ko", "name_en", "city_ko"):
+                        if row.get(k):
+                            names.add(row[k])
+        try:
+            for row in json.loads(
+                    Path(__file__).with_name("rail_stations.json")
+                    .read_text(encoding="utf-8")):
+                if isinstance(row, dict):
+                    for k in ("name", "name_ko", "station"):
+                        if row.get(k):
+                            names.add(row[k])
+        except (OSError, ValueError, TypeError):
+            pass
+        # 접미사를 뗀 형태도 넣는다. 가드레일은 "김포공항"이 아니라
+        # "김포"를 이름으로 집어낸다.
+        for n in list(names):
+            for suf in ("국제공항", "공항", "역"):
+                if n.endswith(suf) and len(n) > len(suf):
+                    names.add(n[: -len(suf)])
+        _PLACE_NAMES = {n.strip() for n in names if n and n.strip()}
+    return _PLACE_NAMES
+
+
+_PLACE_NAMES: set[str] | None = None
+
+
+def _only_place_name_anonymization(resp: dict) -> bool:
+    """가드레일 개입이 "지명을 사람 이름으로 오탐한 익명화" 뿐인가.
+
+    실측(2026-09-04): 가드레일이 **김포·김해를 NAME 으로 탐지**한다.
+    한국 성씨+이름 형태라 NER 이 사람 이름으로 읽는다. 제주·인천은
+    걸리지 않는다. 그래서 "김포공항 지금 지연되나요?" 처럼 게이트·도구·
+    근거 검증을 모두 통과한 정상 답변이 마지막에 폐기됐다 —
+    신규·정정 항공 문항 19개 중 6개(32%)가 이렇게 막혔다.
+
+    action 이 BLOCKED 가 아니라 **ANONYMIZED** 인데도 종전 코드가
+    GUARDRAIL_INTERVENED 를 종류 구분 없이 실패로 처리한 것이 원인이다.
+
+    통과시키는 조건을 좁게 잡는다. 하나라도 어긋나면 종전대로 차단한다.
+      · 민감정보 정책 외의 개입(주제·유해도·단어·근거)이 없다
+      · 모든 PII 항목의 action 이 ANONYMIZED 다 (BLOCKED 가 하나도 없다)
+      · 모든 PII 항목의 type 이 NAME 이다
+      · 탐지된 문자열이 전부 우리 캐시가 아는 지명이다
+    즉 사람 이름·연락처·카드번호 마스킹은 그대로 살아 있다. 우리가
+    되살리는 것은 "우리가 스스로 만들어 넣은 지명"뿐이다."""
+    assessments = resp.get("assessments") or []
+    if not assessments:
+        return False
+    places = _place_names()
+    saw_name = False
+    for a in assessments:
+        # 민감정보 외의 정책이 개입했으면 그대로 차단한다.
+        for other in ("topicPolicy", "contentPolicy", "wordPolicy",
+                      "contextualGroundingPolicy"):
+            pol = a.get(other) or {}
+            if any(pol.get(k) for k in pol):
+                return False
+        sip = a.get("sensitiveInformationPolicy") or {}
+        if sip.get("regexes"):
+            return False
+        for e in sip.get("piiEntities") or []:
+            if e.get("action") != "ANONYMIZED" or e.get("type") != "NAME":
+                return False
+            if not _is_known_place(e.get("match"), places):
+                return False
+            saw_name = True
+    return saw_name
+
+
+# 탐지 문자열에 딸려 오는 조사·방면 표기. 실측에서 가드레일이 "김해"가
+# 아니라 **"김해 행"** 을 통째로 집어냈다. 이걸 벗기지 않으면 정확 일치가
+# 실패해 정상 답변이 그대로 차단된다.
+_PLACE_SUFFIXES = ("행", "발", "편", "국제공항", "공항", "역", "터미널",
+                   "에서", "으로", "까지", "부터", "발권", "도착", "출발")
+
+
+def _is_known_place(match: str | None, places: set[str]) -> bool:
+    """탐지된 문자열이 우리가 아는 지명인가. 조사·방면 표기를 한 겹 벗겨
+    본다. 벗겨도 지명이 아니면 사람 이름으로 보고 차단한다."""
+    m = re.sub(r"\s+", "", match or "")
+    if not m:
+        return False
+    if m in places:
+        return True
+    for suf in _PLACE_SUFFIXES:
+        if m.endswith(suf) and len(m) > len(suf) and m[: -len(suf)] in places:
+            return True
+    return False
+
+
 def apply_guardrail(text: str, source: str) -> tuple[bool, str]:
     if not GUARDRAIL_ID:
         return True, text
@@ -431,6 +538,10 @@ def apply_guardrail(text: str, source: str) -> tuple[bool, str]:
         guardrailIdentifier=GUARDRAIL_ID, guardrailVersion=GUARDRAIL_VERSION,
         source=source, content=[{"text": {"text": text}}])
     if r["action"] == "GUARDRAIL_INTERVENED":
+        if _only_place_name_anonymization(r):
+            # 지명 오탐만 있었다. 원문을 그대로 통과시킨다 —
+            # 마스킹된 문자열을 쓰면 "{NAME}공항 출발편" 이 나간다.
+            return True, text
         outs = r.get("outputs", [])
         return False, outs[0]["text"] if outs else ""
     return True, text
