@@ -115,6 +115,16 @@ KAC_DETAIL_MAX_PAGES = 60    # 전량 4,778건 = 48페이지
 
 TIMEOUT = 30.0
 
+# 평가를 반복해서 돌릴 때 인천 호출을 끄는 스위치 (기본 꺼짐).
+#
+# 필요한지 먼저 재봤다: 인천 질의 40회를 연달아 넣어도 실제 API 호출은
+# **2회**였다(io 별로 하루치를 통째로 받아 60초 캐시). 평가셋 513문항 중
+# 인천 언급은 15개뿐이고 한 번 도는 데 몇 분이면 20~40회 수준이라, 일일
+# 500회 한도에는 한참 못 미친다. 그래서 기본값은 꺼둔다.
+# 하루에 평가를 수십 번 돌리는 상황을 위한 안전판일 뿐이다.
+# 켜면 인천 경로가 None 을 돌려주고 호출부가 목 데이터로 폴백한다.
+SKIP_IIAC = os.environ.get("SKIP_IIAC_API", "").strip().lower() in ("1", "true", "yes")
+
 # 두 API 의 조회 범위. 밖을 물으면 호출하지 않고 바로 알린다 —
 # 헛호출로 쿼터를 쓰지 않는다.
 RANGE_BACK_DAYS = 3          # D-3
@@ -552,6 +562,8 @@ def get_status(airport: str, io: str = "O", ymd: str | None = None,
                 "note": "실시간 운항정보는 3일 전부터 6일 후까지만 조회됩니다"}
 
     if operator == "IIAC":
+        if SKIP_IIAC:
+            return None            # 목 데이터로 폴백한다(제약 5)
         rows = _icn_fetch(io, day)
         if rows is None:
             return None
